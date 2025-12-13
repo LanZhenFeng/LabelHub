@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft,
@@ -36,11 +36,10 @@ import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
-import { itemsApi, projectsApi, type Label as LabelType, type Item } from '@/lib/api'
+import { itemsApi, projectsApi, type Label as LabelType } from '@/lib/api'
 
 export default function AnnotatePage() {
   const { projectId, datasetId } = useParams<{ projectId: string; datasetId: string }>()
-  const navigate = useNavigate()
   const { toast } = useToast()
   const queryClient = useQueryClient()
 

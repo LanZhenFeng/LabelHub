@@ -124,6 +124,7 @@ async def delete_dataset(
         raise HTTPException(status_code=404, detail="Dataset not found")
 
     await db.delete(dataset)
+    await db.flush()
 
 
 async def _get_dataset_stats(db: AsyncSession, dataset_id: int) -> dict:

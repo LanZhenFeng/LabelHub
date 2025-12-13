@@ -122,6 +122,7 @@ async def delete_project(
         raise HTTPException(status_code=404, detail="Project not found")
 
     await db.delete(project)
+    await db.flush()
 
 
 async def _get_project_stats(db: AsyncSession, project_id: int) -> dict:
