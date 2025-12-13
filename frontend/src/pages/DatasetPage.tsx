@@ -148,8 +148,11 @@ export default function DatasetPage() {
   const handleOpenExportDialog = () => {
     // Set default format based on task type when opening dialog
     if (project) {
-      const defaultFormat = project.task_type === 'classification' ? 'csv' : 'coco'
-      setExportFormat(defaultFormat as any)
+      const defaultFormat =
+        project.task_type === 'classification'
+          ? ('csv' as 'csv' | 'json' | 'imagenet')
+          : ('coco' as 'coco' | 'yolo' | 'voc')
+      setExportFormat(defaultFormat)
     }
     setExportDialogOpen(true)
   }
@@ -527,7 +530,10 @@ function ExportDialog({
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label htmlFor="format">导出格式</Label>
-            <Select value={format} onValueChange={(v) => onFormatChange(v as any)}>
+            <Select
+              value={format}
+              onValueChange={(v) => onFormatChange(v as typeof format)}
+            >
               <SelectTrigger id="format">
                 <SelectValue />
               </SelectTrigger>
