@@ -6,6 +6,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { ZoomIn, ZoomOut, Maximize } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 interface ImageViewerProps {
   imageUrl: string
@@ -20,6 +21,7 @@ export function ImageViewer({ imageUrl, className }: ImageViewerProps) {
   const [offset, setOffset] = useState({ x: 0, y: 0 })
   const [isPanning, setIsPanning] = useState(false)
   const [lastPanPoint, setLastPanPoint] = useState<{ x: number; y: number } | null>(null)
+  const [isSpacePressed, setIsSpacePressed] = useState(false)
 
   // Initialize canvas and load image
   useEffect(() => {
@@ -164,8 +166,8 @@ export function ImageViewer({ imageUrl, className }: ImageViewerProps) {
 
   // Mouse panning
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.button === 0 && (e.ctrlKey || e.metaKey || e.shiftKey)) {
-      // Ctrl/Cmd/Shift + left click for pan
+    if (e.button === 0 && isSpacePressed) {
+      // Space + left click for pan
       setIsPanning(true)
       setLastPanPoint({ x: e.clientX, y: e.clientY })
       e.preventDefault()
@@ -175,7 +177,7 @@ export function ImageViewer({ imageUrl, className }: ImageViewerProps) {
       setLastPanPoint({ x: e.clientX, y: e.clientY })
       e.preventDefault()
     }
-  }, [])
+  }, [isSpacePressed])
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!isPanning || !lastPanPoint) return
@@ -203,6 +205,31 @@ export function ImageViewer({ imageUrl, className }: ImageViewerProps) {
     return () => canvas.removeEventListener('wheel', handleWheel)
   }, [handleWheel])
 
+  // Handle space key for panning
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !isSpacePressed) {
+        setIsSpacePressed(true)
+        e.preventDefault()
+      }
+    }
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        setIsSpacePressed(false)
+        setIsPanning(false)
+        setLastPanPoint(null)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('keyup', handleKeyUp)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('keyup', handleKeyUp)
+    }
+  }, [isSpacePressed])
+
   return (
     <div className={className}>
       {/* Toolbar */}
@@ -225,7 +252,7 @@ export function ImageViewer({ imageUrl, className }: ImageViewerProps) {
       {/* Canvas */}
       <div
         ref={containerRef}
-        className="flex-1 bg-black/5 cursor-move"
+        className={cn("flex-1 bg-black/5", isSpacePressed ? "cursor-grab" : isPanning ? "cursor-grabbing" : "cursor-default")}
         style={{ width: '100%', height: 'calc(100% - 48px)' }}
       >
         <canvas
@@ -234,6 +261,7 @@ export function ImageViewer({ imageUrl, className }: ImageViewerProps) {
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
+          onContextMenu={(e) => e.preventDefault()}
           style={{ display: 'block' }}
         />
       </div>
