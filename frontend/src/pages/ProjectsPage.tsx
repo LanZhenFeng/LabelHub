@@ -14,6 +14,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -146,6 +151,12 @@ export default function ProjectsPage() {
     setLabels(newLabels)
   }
 
+  const handleColorChange = (index: number, color: string) => {
+    const newLabels = [...labels]
+    newLabels[index].color = color
+    setLabels(newLabels)
+  }
+
   const handleRemoveLabel = (index: number) => {
     if (labels.length > 1) {
       setLabels(labels.filter((_, i) => i !== index))
@@ -201,10 +212,33 @@ export default function ProjectsPage() {
                   {labels.map((label, index) => (
                     <div key={index} className="flex items-center gap-2">
                       <kbd className="w-6 h-6 flex items-center justify-center text-xs bg-muted rounded border">{index + 1}</kbd>
-                      <div
-                        className="w-6 h-6 rounded border cursor-pointer ring-offset-background transition-colors hover:ring-2 hover:ring-ring hover:ring-offset-2"
-                        style={{ backgroundColor: label.color }}
-                      />
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button
+                            type="button"
+                            className="w-6 h-6 rounded border cursor-pointer ring-offset-background transition-all hover:ring-2 hover:ring-ring hover:ring-offset-2"
+                            style={{ backgroundColor: label.color }}
+                            title="点击选择颜色"
+                          />
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-3" align="start">
+                          <div className="grid grid-cols-4 gap-2">
+                            {PRESET_COLORS.map((color) => (
+                              <button
+                                key={color}
+                                type="button"
+                                className="w-8 h-8 rounded border-2 transition-all hover:scale-110"
+                                style={{
+                                  backgroundColor: color,
+                                  borderColor: label.color === color ? 'hsl(var(--primary))' : 'transparent',
+                                }}
+                                onClick={() => handleColorChange(index, color)}
+                                title={color}
+                              />
+                            ))}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                       <Input
                         placeholder={`标签 ${index + 1}`}
                         value={label.name}
