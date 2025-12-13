@@ -53,7 +53,9 @@ async def export_dataset(
             raise HTTPException(status_code=400, detail=f"Invalid status: {e}")
     
     # Create export directory if not exists
-    export_dir = Path(settings.media_root).parent / "exports"
+    # Use temp directory for exports to avoid permission issues
+    import tempfile
+    export_dir = Path(tempfile.gettempdir()) / "labelhub_exports"
     export_dir.mkdir(parents=True, exist_ok=True)
     
     # Export based on format
