@@ -143,6 +143,26 @@ async def get_next_item(
     )
 
 
+@router.get("/items/{item_id}", response_model=ItemResponse)
+async def get_item(
+    item_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get a single item by ID."""
+    query = (
+        select(Item)
+        .options(selectinload(Item.dataset), selectinload(Item.classifications))
+        .where(Item.id == item_id)
+    )
+    result = await db.execute(query)
+    item = result.scalar_one_or_none()
+
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    return _item_to_response(item, item.dataset.root_path)
+
+
 @router.get("/items/{item_id}/thumb")
 async def get_thumbnail(
     item_id: int,

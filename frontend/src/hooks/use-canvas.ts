@@ -169,6 +169,21 @@ export function useCanvas(options: UseCanvasOptions = {}) {
       canvas.on('selection:cleared', () => {
         setSelectedAnnotationId(null)
       })
+
+      // Mouse wheel zoom
+      canvas.on('mouse:wheel', (opt) => {
+        const delta = opt.e.deltaY
+        let newZoom = canvas.getZoom() * (delta > 0 ? 0.9 : 1.1)
+        newZoom = Math.min(Math.max(newZoom, 0.1), 5)
+        
+        // Zoom to cursor position
+        const pointer = canvas.getScenePoint(opt.e)
+        canvas.zoomToPoint(pointer, newZoom)
+        setZoom(newZoom)
+        
+        opt.e.preventDefault()
+        opt.e.stopPropagation()
+      })
     }
     img.src = imageUrl
   }, [setSelectedAnnotationId])

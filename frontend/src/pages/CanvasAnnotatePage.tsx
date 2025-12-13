@@ -13,6 +13,7 @@ import {
   Trash2,
   Loader2,
   ChevronRight,
+  ChevronLeft,
   Keyboard,
   Save,
 } from 'lucide-react'
@@ -61,6 +62,8 @@ export default function CanvasAnnotatePage() {
   const [currentAnnotations, setCurrentAnnotations] = useState<AnnotationData[]>([])
   const [isDirty, setIsDirty] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
+  const [itemHistory, setItemHistory] = useState<number[]>([]) // Stack of previous item IDs
+  const [currentItemId, setCurrentItemId] = useState<number | null>(null)
 
   // Fetch project for labels
   const { data: project } = useQuery({
@@ -154,6 +157,16 @@ export default function CanvasAnnotatePage() {
     },
   })
 
+  // Track item history for "previous" navigation
+  useEffect(() => {
+    if (item && item.id !== currentItemId) {
+      if (currentItemId !== null) {
+        setItemHistory(prev => [...prev, currentItemId])
+      }
+      setCurrentItemId(item.id)
+    }
+  }, [item, currentItemId])
+
   // Submit mutation
   const submitMutation = useMutation({
     mutationFn: async () => {
@@ -213,6 +226,40 @@ export default function CanvasAnnotatePage() {
     setIsDirty(true)
   }, [])
 
+  // Go to previous item
+  const goToPreviousItem = useCallback(async () => {
+    if (itemHistory.length === 0) {
+      toast({ title: 'No previous item', description: 'You are at the first item' })
+      return
+    }
+    
+    // Pop the last item from history
+    const prevItemId = itemHistory[itemHistory.length - 1]
+    setItemHistory(prev => prev.slice(0, -1))
+    setCurrentItemId(prevItemId)
+    
+    // Fetch the previous item
+    try {
+      const prevItem = await itemsApi.get(prevItemId)
+      queryClient.setQueryData(['nextItem', datasetId], (old: typeof nextItemData) => ({
+        ...old,
+        item: prevItem,
+      }))
+      setCurrentAnnotations([])
+      setIsDirty(false)
+    } catch {
+      toast({ title: 'Error', description: 'Failed to load previous item', variant: 'destructive' })
+    }
+  }, [itemHistory, datasetId, queryClient, nextItemData, toast])
+
+  // Handle right-click to submit
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    if (currentAnnotations.length > 0 && !submitMutation.isPending) {
+      submitMutation.mutate()
+    }
+  }, [currentAnnotations, submitMutation])
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -248,12 +295,19 @@ export default function CanvasAnnotatePage() {
             setDeleteDialogOpen(true)
           }
           break
+        case 'ArrowLeft':
+        case 'Escape':
+          if (e.key === 'ArrowLeft' || (e.key === 'Escape' && itemHistory.length > 0)) {
+            e.preventDefault()
+            goToPreviousItem()
+          }
+          break
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [currentAnnotations, submitMutation, saveMutation])
+  }, [currentAnnotations, submitMutation, saveMutation, itemHistory, goToPreviousItem])
 
   const progress = nextItemData
     ? (nextItemData.done_count / Math.max(nextItemData.total_count, 1)) * 100
@@ -315,6 +369,17 @@ export default function CanvasAnnotatePage() {
 
         {/* Actions */}
         <div className="flex items-center gap-2">
+          {/* Previous button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={goToPreviousItem}
+            disabled={itemHistory.length === 0}
+            title="Previous (←)"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
+
           <Button
             variant="outline"
             size="sm"
@@ -368,8 +433,8 @@ export default function CanvasAnnotatePage() {
         </Button>
       </header>
 
-      {/* Main content */}
-      <div className="flex-1 overflow-hidden">
+      {/* Main content - right click to submit */}
+      <div className="flex-1 overflow-hidden" onContextMenu={handleContextMenu}>
         {nextItemLoading ? (
           <div className="flex items-center justify-center h-full">
             <Skeleton className="w-3/4 h-3/4" />
@@ -495,11 +560,11 @@ export default function CanvasAnnotatePage() {
               <div className="space-y-1 text-sm">
                 <div className="flex justify-between">
                   <span>Zoom In</span>
-                  <kbd className="px-2 py-0.5 bg-muted rounded">+</kbd>
+                  <kbd className="px-2 py-0.5 bg-muted rounded">+ / Scroll</kbd>
                 </div>
                 <div className="flex justify-between">
                   <span>Zoom Out</span>
-                  <kbd className="px-2 py-0.5 bg-muted rounded">-</kbd>
+                  <kbd className="px-2 py-0.5 bg-muted rounded">- / Scroll</kbd>
                 </div>
                 <div className="flex justify-between">
                   <span>Reset Zoom</span>
@@ -517,7 +582,11 @@ export default function CanvasAnnotatePage() {
                 </div>
                 <div className="flex justify-between">
                   <span>Submit & Next</span>
-                  <kbd className="px-2 py-0.5 bg-muted rounded">Enter</kbd>
+                  <kbd className="px-2 py-0.5 bg-muted rounded">Enter / Right-click</kbd>
+                </div>
+                <div className="flex justify-between">
+                  <span>Previous Item</span>
+                  <kbd className="px-2 py-0.5 bg-muted rounded">← / Esc</kbd>
                 </div>
                 <div className="flex justify-between">
                   <span>Skip Item</span>
@@ -539,6 +608,7 @@ export default function CanvasAnnotatePage() {
               <div className="space-y-1 text-sm text-muted-foreground">
                 <p>• Rectangle: Click and drag to draw</p>
                 <p>• Polygon: Click to add points, double-click to close</p>
+                <p>• Right-click: Submit current item</p>
               </div>
             </div>
           </div>
