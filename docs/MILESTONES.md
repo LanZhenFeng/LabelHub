@@ -300,15 +300,21 @@ Week 7-9    ░░░░░░░░░░░░░░░░░░░░░░�
 #### 数据导出
 
 **格式支持**
-- COCO JSON
-- YOLO TXT + classes.txt
-- Pascal VOC XML
+- **分类任务**:
+  - CSV: filename,label 表格格式
+  - JSON: 结构化格式含元数据
+  - ImageNet: 按类别文件夹组织
+- **检测/分割任务**:
+  - COCO JSON: MS COCO 标准格式
+  - YOLO TXT + classes.txt: 归一化坐标
+  - Pascal VOC XML: 标准边界框
 
 **导出选项**
-- 筛选条件 (状态/日期/标签)
+- 筛选条件 (状态/日期/标签) - 默认仅done状态
 - 图片包含选项 (仅标注/含图片)
-- 异步导出 (后台生成 ZIP)
-- 下载链接通知
+- ZIP打包下载
+- 任务类型感知（自动显示对应格式）
+- 格式验证（防止错误使用）
 
 ### ✅ 验收标准
 
@@ -351,7 +357,7 @@ Week 7-9    ░░░░░░░░░░░░░░░░░░░░░░�
 3. **HTTP缓存** - ETag/304支持，Cache-Control策略，60-80%带宽节省
 4. **IndexedDB** - LRU缓存策略，200MB容量限制，10MB单文件限制
 5. **骨架屏** - 数据集页/分类页/检测分割页统一加载体验
-6. **数据导出** - COCO/YOLO/VOC三种格式，ZIP打包下载
+6. **数据导出** - 6种格式全支持（CSV/JSON/ImageNet/COCO/YOLO/VOC），任务类型感知 ⭐️
 7. **Parser Template后端** - 完整CRUD API，JMESPath引擎，安全限制
 8. **JSONL流式** - `ParserService` 类，逐行解析，不占内存
 9. **内置模板** - 4种格式（builtin_coco/builtin_yolo/builtin_voc/generic_detection）
@@ -367,6 +373,7 @@ Week 7-9    ░░░░░░░░░░░░░░░░░░░░░░�
 1. **预标注采纳UI** - 后端完成，前端导入UI完成，采纳交互推迟至M3
 2. **Service Worker** - 推迟至M3，当前HTTP缓存已足够
 3. **If-Match乐观锁** - 基础实现完成，未启用（推迟至M3多用户场景）
+4. **数据导出增强** - 超出计划：新增分类任务导出（CSV/JSON/ImageNet），任务类型感知 🎉
 
 **性能提升**：
 - DOM节点: 65% ↓ (600 → 210，100图片场景)
