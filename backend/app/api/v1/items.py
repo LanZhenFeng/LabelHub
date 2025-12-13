@@ -1,6 +1,8 @@
 """Item API endpoints."""
 
+from datetime import datetime
 from pathlib import Path
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse
@@ -8,13 +10,14 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.api.dependencies import CurrentUser
 from app.core.database import get_db
 from app.models.annotation import AnnotationEvent, ClassificationAnnotation, EventType
 from app.models.dataset import Dataset
 from app.models.item import Item, ItemStatus
 from app.schemas.item import ItemListResponse, ItemResponse, NextItemResponse
+from app.services.cache import add_cache_headers, check_not_modified
 from app.services.thumbs import ThumbnailService
-from app.services.cache import check_not_modified, add_cache_headers
 
 router = APIRouter()
 
@@ -22,10 +25,11 @@ router = APIRouter()
 @router.get("/datasets/{dataset_id}/items", response_model=ItemListResponse)
 async def list_items(
     dataset_id: int,
+    current_user: CurrentUser,  # M4: Require authentication
     status: ItemStatus | None = Query(None, description="Filter by status"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)] = Depends(get_db),
 ):
     """List items in a dataset with pagination."""
     # Verify dataset exists
@@ -71,9 +75,16 @@ async def list_items(
 @router.get("/datasets/{dataset_id}/next-item", response_model=NextItemResponse)
 async def get_next_item(
     dataset_id: int,
-    db: AsyncSession = Depends(get_db),
+    current_user: CurrentUser,  # M4: Require authentication
+    db: Annotated[AsyncSession, Depends(get_db)] = Depends(get_db),
 ):
-    """Get the next item to annotate."""
+    """Get the next item to annotate.
+    
+    M4: Auto-assign items to the current user.
+    - If item is unassigned (annotator_id = NULL), assign to current user
+    - If item is assigned to current user and in_progress, return it
+    - Admins can see all items
+    """
     # Verify dataset exists and get it
     dataset_query = select(Dataset).where(Dataset.id == dataset_id)
     result = await db.execute(dataset_query)
@@ -82,12 +93,21 @@ async def get_next_item(
     if not dataset:
         raise HTTPException(status_code=404, detail="Dataset not found")
 
-    # Get next todo or in_progress item
+    # Get next item based on user role
     item_query = (
         select(Item)
         .where(Item.dataset_id == dataset_id)
         .where(Item.status.in_([ItemStatus.TODO, ItemStatus.IN_PROGRESS]))
-        .order_by(Item.id)
+    )
+
+    # For annotators: only show unassigned items or items assigned to them
+    if current_user.role == "annotator":
+        item_query = item_query.where(
+            (Item.annotator_id == None) | (Item.annotator_id == current_user.id)  # noqa: E711
+        )
+
+    item_query = (
+        item_query.order_by(Item.id)
         .limit(1)
         .options(selectinload(Item.classifications))
     )
@@ -113,15 +133,21 @@ async def get_next_item(
     remaining_count = result.scalar() or 0
 
     if item:
+        # Auto-assign to current user if unassigned
+        if item.annotator_id is None:
+            item.annotator_id = current_user.id
+            item.assigned_at = datetime.utcnow()
+
         # Set status to in_progress if todo
         if item.status == ItemStatus.TODO:
             item.status = ItemStatus.IN_PROGRESS
 
-        # Write open event
+        # Write open event with user_id
         event = AnnotationEvent(
             project_id=dataset.project_id,
             dataset_id=dataset_id,
             item_id=item.id,
+            user_id=current_user.id,  # M4: Track who opened the item
             event_type=EventType.OPEN,
             payload=None,
         )
@@ -147,7 +173,8 @@ async def get_next_item(
 @router.get("/items/{item_id}", response_model=ItemResponse)
 async def get_item(
     item_id: int,
-    db: AsyncSession = Depends(get_db),
+    current_user: CurrentUser,  # M4: Require authentication
+    db: Annotated[AsyncSession, Depends(get_db)] = Depends(get_db),
 ):
     """Get a single item by ID."""
     query = (
@@ -167,7 +194,8 @@ async def get_item(
 @router.get("/items/{item_id}/previous", response_model=ItemResponse | None)
 async def get_previous_item(
     item_id: int,
-    db: AsyncSession = Depends(get_db),
+    current_user: CurrentUser,  # M4: Require authentication
+    db: Annotated[AsyncSession, Depends(get_db)] = Depends(get_db),
 ):
     """Get the previous item in the dataset (by ID order)."""
     # Get current item to know dataset
@@ -204,7 +232,8 @@ async def get_previous_item(
 @router.get("/items/{item_id}/next", response_model=ItemResponse | None)
 async def get_next_item_by_order(
     item_id: int,
-    db: AsyncSession = Depends(get_db),
+    current_user: CurrentUser,  # M4: Require authentication
+    db: Annotated[AsyncSession, Depends(get_db)] = Depends(get_db),
 ):
     """Get the next item in the dataset (by ID order, regardless of status)."""
     # Get current item to know dataset
@@ -242,8 +271,9 @@ async def get_next_item_by_order(
 async def get_thumbnail(
     item_id: int,
     request: Request,
+    current_user: CurrentUser,  # M4: Require authentication
     size: int = Query(256, ge=64, le=512),
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)] = Depends(get_db),
 ):
     """Get thumbnail for an item with HTTP caching support."""
     # Get item with dataset
@@ -288,8 +318,9 @@ async def get_thumbnail(
 async def get_image(
     item_id: int,
     request: Request,
+    current_user: CurrentUser,  # M4: Require authentication
     variant: str = Query("orig", regex="^(orig|medium)$"),
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)] = Depends(get_db),
 ):
     """Get original or medium image for an item with HTTP caching support."""
     # Get item with dataset
