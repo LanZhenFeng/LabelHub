@@ -63,37 +63,77 @@ make up
 - 📖 **API 文档**: http://localhost:8000/docs
 - 🔧 **健康检查**: http://localhost:8000/api/v1/healthz
 
-### 方式二：开发模式
+### 方式二：本地开发（不使用 Docker）
 
-**1. 安装依赖**
+**1. 后端设置**
 
 ```bash
-# 后端
 cd backend
-python -m venv .venv
+
+# 创建虚拟环境（需要 Python 3.11+）
+python3 -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
+
+# 安装依赖
 pip install -r requirements.txt
 
-# 前端
-cd ../frontend
-npm install
+# 配置环境变量
+cp .env.example .env
+# 编辑 .env，设置 MEDIA_ROOT 为你的图片目录
 ```
 
-**2. 启动开发环境**
+**2. 初始化数据库**
 
 ```bash
-# 启动数据库和后端（使用 docker）
-make dev
+# 运行数据库迁移（使用 SQLite）
+alembic upgrade head
+```
 
-# 启动前端开发服务器（新终端）
+**3. 启动后端**
+
+```bash
+# 开发模式（带热重载）
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+**4. 前端设置（新终端）**
+
+```bash
 cd frontend
+
+# 安装依赖
+npm install
+
+# 启动开发服务器
 npm run dev
 ```
 
-**3. 访问**
+**5. 访问**
 
 - 🌐 **前端**: http://localhost:5173
-- 📖 **API**: http://localhost:8000/docs
+- 📖 **API 文档**: http://localhost:8000/docs
+- 🔧 **健康检查**: http://localhost:8000/api/v1/healthz
+
+### 方式三：混合模式（推荐开发）
+
+使用 Docker 运行数据库，本地运行应用代码：
+
+```bash
+# 启动 PostgreSQL（使用 docker）
+docker-compose up -d postgres
+
+# 后端（新终端）
+cd backend
+source .venv/bin/activate
+# 修改 .env 中的 DATABASE_URL 指向 PostgreSQL
+# DATABASE_URL=postgresql+asyncpg://labelhub:labelhub_secret@localhost:5432/labelhub
+alembic upgrade head
+uvicorn app.main:app --reload --port 8000
+
+# 前端（新终端）
+cd frontend
+npm run dev
+```
 
 ---
 
@@ -120,11 +160,16 @@ npm run dev
 1. 点击数据集进入数据集页面
 2. 点击 **"Start Annotation"** 进入标注页面
 3. 使用键盘快捷键快速标注：
-   - `1-9`: 选择对应标签
-   - `Enter`: 提交并进入下一张
-   - `Space`: 提交并进入下一张
-   - `S`: 跳过（需填写原因）
-   - `Ctrl+Delete`: 删除当前图片
+
+| 快捷键 | 功能 |
+|--------|------|
+| `1-9` | 选择对应标签 |
+| `Enter` | 提交当前标注 |
+| `Space` | 提交并进入下一张 |
+| `S` | 跳过当前（弹窗填写原因） |
+| `Ctrl/Cmd + Delete` | 删除当前图片（弹窗确认） |
+
+> 💡 **提示**：标注页面右侧边栏会显示快捷键提示
 
 ### 4. 配置服务器图片路径
 
