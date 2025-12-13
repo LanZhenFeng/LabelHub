@@ -163,6 +163,43 @@ async def get_item(
     return _item_to_response(item, item.dataset.root_path)
 
 
+@router.get("/items/{item_id}/previous", response_model=ItemResponse | None)
+async def get_previous_item(
+    item_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get the previous item in the dataset (by ID order)."""
+    # Get current item to know dataset
+    current_query = (
+        select(Item)
+        .options(selectinload(Item.dataset))
+        .where(Item.id == item_id)
+    )
+    result = await db.execute(current_query)
+    current_item = result.scalar_one_or_none()
+
+    if not current_item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    # Get previous item (smaller ID in same dataset, excluding deleted)
+    prev_query = (
+        select(Item)
+        .options(selectinload(Item.dataset), selectinload(Item.classifications))
+        .where(Item.dataset_id == current_item.dataset_id)
+        .where(Item.id < item_id)
+        .where(Item.status != ItemStatus.DELETED)
+        .order_by(Item.id.desc())
+        .limit(1)
+    )
+    result = await db.execute(prev_query)
+    prev_item = result.scalar_one_or_none()
+
+    if not prev_item:
+        return None
+
+    return _item_to_response(prev_item, prev_item.dataset.root_path)
+
+
 @router.get("/items/{item_id}/thumb")
 async def get_thumbnail(
     item_id: int,

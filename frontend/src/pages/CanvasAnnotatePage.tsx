@@ -228,14 +228,30 @@ export default function CanvasAnnotatePage() {
 
   // Go to previous item
   const goToPreviousItem = useCallback(async () => {
-    if (itemHistory.length === 0) {
-      toast({ title: 'No previous item', description: 'You are at the first item' })
-      return
+    if (!item) return
+    
+    // Try client history first, then fallback to server API
+    let prevItemId: number | null = null
+    
+    if (itemHistory.length > 0) {
+      // Use client history
+      prevItemId = itemHistory[itemHistory.length - 1]
+      setItemHistory(prev => prev.slice(0, -1))
+    } else {
+      // Try to get previous from server
+      try {
+        const prevItem = await itemsApi.getPrevious(item.id)
+        if (!prevItem) {
+          toast({ title: 'No previous item', description: 'This is the first item' })
+          return
+        }
+        prevItemId = prevItem.id
+      } catch {
+        toast({ title: 'No previous item', description: 'This is the first item' })
+        return
+      }
     }
     
-    // Pop the last item from history
-    const prevItemId = itemHistory[itemHistory.length - 1]
-    setItemHistory(prev => prev.slice(0, -1))
     setCurrentItemId(prevItemId)
     
     // Fetch the previous item
@@ -374,7 +390,7 @@ export default function CanvasAnnotatePage() {
             variant="outline"
             size="sm"
             onClick={goToPreviousItem}
-            disabled={itemHistory.length === 0}
+            disabled={false}
             title="Previous (←)"
           >
             <ChevronLeft className="w-4 h-4" />

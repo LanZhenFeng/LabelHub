@@ -231,7 +231,7 @@ export function useCanvas(options: UseCanvasOptions = {}) {
         opt.e.stopPropagation()
       })
 
-      // Panning with middle mouse button or when isPanning is true
+      // Panning with middle mouse button or when space key is held (isPanning)
       canvas.on('mouse:down', (opt) => {
         const e = opt.e as MouseEvent
         // Middle mouse button (button 1) for panning
@@ -240,6 +240,18 @@ export function useCanvas(options: UseCanvasOptions = {}) {
           lastPanPointRef.current = { x: e.clientX, y: e.clientY }
           canvas.defaultCursor = 'grabbing'
           e.preventDefault()
+        }
+      })
+
+      // Separate handler for left-click panning when space is held
+      canvas.on('mouse:down:before', (opt) => {
+        const e = opt.e as MouseEvent
+        // Left button + space key held = panning
+        if (e.button === 0 && canvas.defaultCursor === 'grab') {
+          lastPanPointRef.current = { x: e.clientX, y: e.clientY }
+          canvas.defaultCursor = 'grabbing'
+          e.preventDefault()
+          e.stopPropagation()
         }
       })
 
@@ -257,10 +269,11 @@ export function useCanvas(options: UseCanvasOptions = {}) {
       })
 
       canvas.on('mouse:up', () => {
-        if (lastPanPointRef.current) {
-          setIsPanning(false)
-          lastPanPointRef.current = null
-          canvas.defaultCursor = 'default'
+        // Only clear pan point, keep isPanning if space is held
+        lastPanPointRef.current = null
+        // Restore cursor based on whether space is still held
+        if (canvas.defaultCursor === 'grabbing') {
+          canvas.defaultCursor = 'grab'
         }
       })
     }
