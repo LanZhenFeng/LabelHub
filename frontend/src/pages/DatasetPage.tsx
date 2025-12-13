@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useVirtualizer } from '@tanstack/react-virtual'
@@ -42,6 +42,7 @@ export default function DatasetPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [page, setPage] = useState(1)
   const parentRef = useRef<HTMLDivElement>(null)
+  const [useVirtual, setUseVirtual] = useState(false)
 
   const { data: project } = useQuery({
     queryKey: ['project', projectId],
@@ -55,19 +56,28 @@ export default function DatasetPage() {
     enabled: !!datasetId,
   })
 
-  // 增加 page_size 以支持虚拟列表
+  // 只对单页大量图片使用虚拟列表（超过100张）
   const { data: itemsData, isLoading: itemsLoading } = useQuery({
     queryKey: ['items', datasetId, statusFilter, page],
     queryFn: () =>
       itemsApi.list(Number(datasetId), {
         status: statusFilter === 'all' ? undefined : statusFilter,
         page,
-        page_size: 200, // 增加单页大小以配合虚拟滚动
+        page_size: 50,
       }),
     enabled: !!datasetId,
   })
 
-  // 虚拟列表配置
+  // 决定是否使用虚拟列表
+  useEffect(() => {
+    if (itemsData && itemsData.items.length > 100) {
+      setUseVirtual(true)
+    } else {
+      setUseVirtual(false)
+    }
+  }, [itemsData])
+
+  // 虚拟列表配置（仅在数据量大时使用）
   const items = itemsData?.items || []
   const columnCount = viewMode === 'grid' ? 6 : 1
   const rowCount = Math.ceil(items.length / columnCount)
@@ -75,8 +85,9 @@ export default function DatasetPage() {
   const rowVirtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => (viewMode === 'grid' ? 180 : 70), // grid: 图片高度, list: 行高
-    overscan: 3, // 预渲染行数
+    estimateSize: () => (viewMode === 'grid' ? 200 : 88), // grid: 图片+gap, list: 行高+gap
+    overscan: 5, // 预渲染行数
+    enabled: useVirtual,
   })
 
   const scanMutation = useMutation({
@@ -221,72 +232,117 @@ export default function DatasetPage() {
               </Button>
             )}
           </div>
-        ) : (
-          <div
-            style={{
-              height: `${rowVirtualizer.getTotalSize()}px`,
-              width: '100%',
-              position: 'relative',
-            }}
-          >
-            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-              const startIndex = virtualRow.index * columnCount
-              const rowItems = items.slice(startIndex, startIndex + columnCount)
+        ) : useVirtual ? (
+          // 虚拟列表模式（大量数据）
+          <>
+            <div
+              style={{
+                height: `${rowVirtualizer.getTotalSize()}px`,
+                width: '100%',
+                position: 'relative',
+              }}
+            >
+              {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                const startIndex = virtualRow.index * columnCount
+                const rowItems = items.slice(startIndex, startIndex + columnCount)
 
-              return (
-                <div
-                  key={virtualRow.key}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: `${virtualRow.size}px`,
-                    transform: `translateY(${virtualRow.start}px)`,
-                  }}
+                return (
+                  <div
+                    key={virtualRow.key}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: `${virtualRow.size}px`,
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                  >
+                    {viewMode === 'grid' ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                        {rowItems.map((item) => (
+                          <ImageCard key={item.id} item={item} />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {rowItems.map((item) => (
+                          <ImageRow key={item.id} item={item} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            
+            {/* Pagination - 虚拟列表模式 */}
+            {itemsData && itemsData.total_pages > 1 && (
+              <div className="flex items-center justify-center gap-2 mt-6">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
                 >
-                  {viewMode === 'grid' ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                      {rowItems.map((item) => (
-                        <ImageCard key={item.id} item={item} />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {rowItems.map((item) => (
-                        <ImageRow key={item.id} item={item} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        )}
-
-        {/* Pagination */}
-        {itemsData && itemsData.total_pages > 1 && (
-          <div className="flex items-center justify-center gap-2 mt-6">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-            >
-              Previous
-            </Button>
-            <span className="text-sm text-muted-foreground">
-              Page {page} of {itemsData.total_pages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((p) => Math.min(itemsData.total_pages, p + 1))}
-              disabled={page === itemsData.total_pages}
-            >
-              Next
-            </Button>
-          </div>
+                  Previous
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  Page {page} of {itemsData.total_pages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.min(itemsData.total_pages, p + 1))}
+                  disabled={page === itemsData.total_pages}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
+          </>
+        ) : (
+          // 常规模式（少量数据）
+          <>
+            {viewMode === 'grid' ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {items.map((item) => (
+                  <ImageCard key={item.id} item={item} />
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {items.map((item) => (
+                  <ImageRow key={item.id} item={item} />
+                ))}
+              </div>
+            )}
+            
+            {/* Pagination - 常规模式 */}
+            {itemsData && itemsData.total_pages > 1 && (
+              <div className="flex items-center justify-center gap-2 mt-6">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                >
+                  Previous
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  Page {page} of {itemsData.total_pages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.min(itemsData.total_pages, p + 1))}
+                  disabled={page === itemsData.total_pages}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
