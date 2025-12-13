@@ -266,7 +266,7 @@ export default function CanvasAnnotatePage() {
     } catch {
       toast({ title: 'Error', description: 'Failed to load previous item', variant: 'destructive' })
     }
-  }, [itemHistory, datasetId, queryClient, nextItemData, toast])
+  }, [item, itemHistory, datasetId, queryClient, nextItemData, toast])
 
   // Handle right-click to submit
   const handleContextMenu = useCallback((e: React.MouseEvent) => {

@@ -51,6 +51,8 @@ export function useCanvas(options: UseCanvasOptions = {}) {
   const drawingPointsRef = useRef<number[][]>([])
   const tempPolygonRef = useRef<Polygon | null>(null)
   const lastPanPointRef = useRef<{ x: number; y: number } | null>(null)
+  const initialScaleRef = useRef<number>(1)
+  const imageDimensionsRef = useRef<{ width: number; height: number } | null>(null)
 
   // Update history state
   const updateHistoryState = useCallback(() => {
@@ -160,42 +162,56 @@ export function useCanvas(options: UseCanvasOptions = {}) {
       const containerWidth = container.clientWidth
       const containerHeight = container.clientHeight
 
-      // Calculate scale to fit
-      const scaleX = containerWidth / img.width
-      const scaleY = containerHeight / img.height
+      // Store image dimensions for reset
+      imageDimensionsRef.current = { width: img.width, height: img.height }
+
+      // Calculate scale to fit image in container with padding
+      const padding = 40
+      const availableWidth = containerWidth - padding * 2
+      const availableHeight = containerHeight - padding * 2
+      const scaleX = availableWidth / img.width
+      const scaleY = availableHeight / img.height
       const scale = Math.min(scaleX, scaleY, 1) // Don't scale up
 
-      const canvasWidth = Math.floor(img.width * scale)
-      const canvasHeight = Math.floor(img.height * scale)
+      // Store initial scale for reset
+      initialScaleRef.current = scale
 
-      // Create canvas element with correct dimensions
+      // Canvas fills the entire container
       const canvasEl = document.createElement('canvas')
       canvasEl.id = 'annotation-canvas'
-      canvasEl.width = canvasWidth
-      canvasEl.height = canvasHeight
+      canvasEl.width = containerWidth
+      canvasEl.height = containerHeight
       container.innerHTML = ''
       container.appendChild(canvasEl)
 
-      // Create Fabric canvas with dimensions
+      // Create Fabric canvas filling the container
       const canvas = new FabricCanvas(canvasEl, {
-        width: canvasWidth,
-        height: canvasHeight,
+        width: containerWidth,
+        height: containerHeight,
         selection: true,
         preserveObjectStacking: true,
       })
       canvasRef.current = canvas
 
-      // Set background image using FabricImage
+      // Set background image using FabricImage - centered in canvas
       FabricImage.fromURL(imageUrl, { crossOrigin: 'anonymous' }).then((fabricImg) => {
+        // Position image centered
+        const imageWidth = img.width * scale
+        const imageHeight = img.height * scale
+        const offsetX = (containerWidth - imageWidth) / 2
+        const offsetY = (containerHeight - imageHeight) / 2
+
         fabricImg.scaleX = scale
         fabricImg.scaleY = scale
+        fabricImg.left = offsetX
+        fabricImg.top = offsetY
         fabricImg.selectable = false
         fabricImg.evented = false
         canvas.backgroundImage = fabricImg
         canvas.requestRenderAll()
       })
 
-      setZoom(scale)
+      setZoom(1) // Zoom is now relative to initial view (1 = fit to container)
 
       // Event handlers
       canvas.on('selection:created', (e) => {
@@ -397,7 +413,8 @@ export function useCanvas(options: UseCanvasOptions = {}) {
     const canvas = canvasRef.current
     if (!canvas || !selectedLabelId) return
 
-    const pointer = canvas.getViewportPoint(e.e)
+    // Use getScenePoint to get coordinates in image space (accounting for zoom/pan)
+    const pointer = canvas.getScenePoint(e.e)
 
     if (tool === 'bbox') {
       setIsDrawing(true)
@@ -444,7 +461,8 @@ export function useCanvas(options: UseCanvasOptions = {}) {
     const canvas = canvasRef.current
     if (!canvas) return
 
-    const pointer = canvas.getViewportPoint(e.e)
+    // Use getScenePoint to get coordinates in image space (accounting for zoom/pan)
+    const pointer = canvas.getScenePoint(e.e)
 
     if (tool === 'bbox' && isDrawing && drawingPointsRef.current.length > 0) {
       const startPoint = drawingPointsRef.current[0]
@@ -472,7 +490,8 @@ export function useCanvas(options: UseCanvasOptions = {}) {
       setIsDrawing(false)
 
       const startPoint = drawingPointsRef.current[0]
-      const pointer = canvas.getViewportPoint(e.e)
+      // Use getScenePoint to get coordinates in image space (accounting for zoom/pan)
+      const pointer = canvas.getScenePoint(e.e)
       const width = Math.abs(pointer.x - startPoint[0])
       const height = Math.abs(pointer.y - startPoint[1])
 
@@ -590,7 +609,9 @@ export function useCanvas(options: UseCanvasOptions = {}) {
     const canvas = canvasRef.current
     if (!canvas) return
     const newZoom = Math.min(zoom * 1.2, 5)
-    canvas.setZoom(newZoom)
+    // Zoom to center of canvas
+    const center = new Point(canvas.width! / 2, canvas.height! / 2)
+    canvas.zoomToPoint(center, newZoom)
     setZoom(newZoom)
   }, [zoom])
 
@@ -598,14 +619,17 @@ export function useCanvas(options: UseCanvasOptions = {}) {
     const canvas = canvasRef.current
     if (!canvas) return
     const newZoom = Math.max(zoom / 1.2, 0.1)
-    canvas.setZoom(newZoom)
+    // Zoom to center of canvas
+    const center = new Point(canvas.width! / 2, canvas.height! / 2)
+    canvas.zoomToPoint(center, newZoom)
     setZoom(newZoom)
   }, [zoom])
 
   const resetZoom = useCallback(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    canvas.setZoom(1)
+    // Reset viewport transform to identity (centered view)
+    canvas.setViewportTransform([1, 0, 0, 1, 0, 0])
     setZoom(1)
   }, [])
 

@@ -116,7 +116,7 @@ export const itemsApi = {
     api.get<ItemListResponse>(`/datasets/${datasetId}/items`, { params }).then((r) => r.data),
   get: (itemId: number) => api.get<Item>(`/items/${itemId}`).then((r) => r.data),
   getPrevious: (itemId: number) =>
-    api.get<Item | null>(`/items/${itemId}/previous`).then((r) => r.data),
+    api.get<Item | null>(`/items/${itemId}/previous`).then((r) => r.data || null),
   getNext: (datasetId: number) =>
     api.get<NextItemResponse>(`/datasets/${datasetId}/next-item`).then((r) => r.data),
   classify: (itemId: number, label: string) =>
