@@ -649,10 +649,10 @@ const trackAnnotation = {
 - [x] 画布快捷键系统可用 (V/R/P/Delete/Ctrl+Z/Y/←/→)
 - [x] Undo/Redo 系统可用 (Command Pattern, 50步)
 - [x] 分类任务 Canvas 图片查看器 (统一缩放平移交互)
-- [x] 上下页导航 (←/→ 按钮和快捷键)
+- [x] 上下页导航 (←/→ 按钮和快捷键，限制仅已处理项目)
 - [x] 帮助系统 (? 键显示快捷键帮助)
-- [x] 右键提交功能
 - [x] 状态机 (todo/in_progress/done/skipped/deleted) - *M0 已实现*
+- [x] 标注状态管理和持久化（防止切换时数据丢失）
 
 ### M2 Checklist
 - [ ] 虚拟列表实现

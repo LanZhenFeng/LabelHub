@@ -398,8 +398,8 @@ make db-reset
 ## 🗺️ 路线图
 
 - **M0**: 基础框架 + 分类标注闭环 ✅
-- **M1 (当前)**: BBox/Polygon 画布交互 + 快捷键系统 + Undo/Redo ✅
-- **M2**: 虚拟列表 + 预取优化 + Parser Template 预标注导入
+- **M1**: BBox/Polygon 画布交互 + 快捷键系统 + Undo/Redo ✅
+- **M2 (当前)**: 虚拟列表 + 预取优化 + Parser Template 预标注导入
 - **M3**: 效率 Dashboard + 导出功能 + 文档完善
 
 ---
