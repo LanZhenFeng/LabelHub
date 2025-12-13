@@ -16,6 +16,7 @@ if TYPE_CHECKING:
         PolygonAnnotation,
     )
     from app.models.dataset import Dataset
+    from app.models.user import User
 
 
 class ItemStatus(str, enum.Enum):
@@ -59,6 +60,25 @@ class Item(Base):
         index=True,
     )
     skip_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    
+    # 用户分配相关字段 (M4: Multi-user support)
+    annotator_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Assigned annotator user ID",
+    )
+    assigned_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="Timestamp when item was assigned",
+    )
+    assigned_by: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="User ID who assigned this item",
+    )
+    
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -73,6 +93,16 @@ class Item(Base):
 
     # Relationships
     dataset: Mapped["Dataset"] = relationship("Dataset", back_populates="items")
+    annotator: Mapped["User | None"] = relationship(
+        "User",
+        back_populates="items_assigned",
+        foreign_keys=[annotator_id],
+    )
+    assigned_by_user: Mapped["User | None"] = relationship(
+        "User",
+        back_populates="items_assigned_by",
+        foreign_keys=[assigned_by],
+    )
     classifications: Mapped[list["ClassificationAnnotation"]] = relationship(
         "ClassificationAnnotation",
         back_populates="item",
