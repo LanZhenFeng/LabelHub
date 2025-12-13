@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Plus, FolderOpen, Trash2, MoreVertical, ImageIcon } from 'lucide-react'
+import { Plus, FolderOpen, Trash2, MoreVertical, ImageIcon, BarChart3 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -402,6 +402,14 @@ function ProjectCard({
 
         {/* Actions */}
         <div className="flex gap-2 pt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1"
+            onClick={() => (window.location.href = `/projects/${project.id}/dashboard`)}
+          >
+            <BarChart3 className="w-3 h-3 mr-1" /> Dashboard
+          </Button>
           <Button variant="outline" size="sm" className="flex-1" onClick={onDelete}>
             <Trash2 className="w-3 h-3 mr-1" /> Delete
           </Button>

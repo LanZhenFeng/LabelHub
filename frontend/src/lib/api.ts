@@ -288,5 +288,59 @@ export const parserTemplatesApi = {
     api.post<ParseTestResponse>('/parser-templates/test', data).then((r) => r.data),
 }
 
+// Statistics Types
+export interface OverviewStats {
+  total_items: number
+  completed_items: number
+  in_progress_items: number
+  skipped_items: number
+  todo_items: number
+  completion_rate: number
+  avg_annotation_time: number | null
+  avg_daily_throughput: number | null
+  skip_rate: number
+  pre_annotation_adopt_rate: number | null
+  pre_annotation_modify_rate: number | null
+  category_distribution: Record<string, number>
+}
+
+export interface DailyStats {
+  stat_date: string
+  completed_count: number
+  skipped_count: number
+  avg_annotation_time: number | null
+  active_annotators: number
+}
+
+export interface AnnotatorStats {
+  annotator_id: string
+  annotator_name: string
+  completed_count: number
+  avg_annotation_time: number | null
+  contribution_rate: number
+  skip_rate: number
+}
+
+export const statsApi = {
+  getProjectOverview: (projectId: number, datasetId?: number) =>
+    api
+      .get<OverviewStats>(`/stats/projects/${projectId}/overview`, {
+        params: datasetId ? { dataset_id: datasetId } : {},
+      })
+      .then((r) => r.data),
+  getProjectDaily: (projectId: number, datasetId?: number, days: number = 30) =>
+    api
+      .get<DailyStats[]>(`/stats/projects/${projectId}/daily`, {
+        params: { dataset_id: datasetId, days },
+      })
+      .then((r) => r.data),
+  getProjectAnnotators: (projectId: number, datasetId?: number) =>
+    api
+      .get<AnnotatorStats[]>(`/stats/projects/${projectId}/annotators`, {
+        params: datasetId ? { dataset_id: datasetId } : {},
+      })
+      .then((r) => r.data),
+}
+
 export default api
 
