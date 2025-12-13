@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   Clock,
   Ban,
+  Upload,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -144,6 +145,13 @@ export default function DatasetPage() {
           >
             <RefreshCw className={cn('w-4 h-4 mr-2', scanMutation.isPending && 'animate-spin')} />
             Rescan
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => navigate(`/projects/${projectId}/datasets/${datasetId}/import`)}
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            Import
           </Button>
           <Button onClick={handleStartAnnotation} disabled={!dataset || dataset.todo_count === 0}>
             <Play className="w-4 h-4 mr-2" />

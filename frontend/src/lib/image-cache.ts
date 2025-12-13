@@ -7,19 +7,20 @@ import { openDB, DBSchema, IDBPDatabase } from 'idb'
 
 interface ImageCacheDB extends DBSchema {
   images: {
-    key: string // URL
+    key: string
     value: {
       url: string
       blob: Blob
-      size: number // bytes
-      accessed: number // timestamp
-      cached: number // timestamp
+      size: number
+      accessed: number
+      cached: number
     }
+    indexes: { 'accessed': number; 'size': number }
   }
   metadata: {
     key: string
     value: {
-      totalSize: number // bytes
+      totalSize: number
       itemCount: number
     }
   }

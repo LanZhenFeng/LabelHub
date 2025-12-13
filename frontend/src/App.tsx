@@ -6,6 +6,7 @@ import ProjectsPage from '@/pages/ProjectsPage'
 import DatasetPage from '@/pages/DatasetPage'
 import AnnotatePage from '@/pages/AnnotatePage'
 import CanvasAnnotatePage from '@/pages/CanvasAnnotatePage'
+import ImportPage from '@/pages/ImportPage'
 import { projectsApi } from '@/lib/api'
 import { Loader2 } from 'lucide-react'
 
@@ -45,6 +46,7 @@ function App() {
           <Route path="projects" element={<ProjectsPage />} />
           <Route path="projects/:projectId/datasets/:datasetId" element={<DatasetPage />} />
           <Route path="projects/:projectId/datasets/:datasetId/annotate" element={<AnnotateRouter />} />
+          <Route path="projects/:projectId/datasets/:datasetId/import" element={<ImportPage />} />
         </Route>
       </Routes>
       <Toaster />

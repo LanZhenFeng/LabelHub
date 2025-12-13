@@ -224,5 +224,69 @@ export const labelsApi = {
     api.post<Label[]>(`/projects/${projectId}/labels`, { labels }).then((r) => r.data),
 }
 
+// ===== Parser Template Types =====
+
+export interface ParserTemplate {
+  id: number
+  name: string
+  description: string | null
+  input_type: 'json' | 'jsonl'
+  input_encoding: string
+  record_path: string | null
+  mapping: Record<string, unknown>
+  validation: Record<string, unknown> | null
+  is_builtin: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface ParserTemplateCreate {
+  name: string
+  description?: string
+  input_type: 'json' | 'jsonl'
+  input_encoding?: string
+  record_path?: string
+  mapping: Record<string, unknown>
+  validation?: Record<string, unknown>
+}
+
+export interface ParseTestRequest {
+  template_id?: number
+  template?: ParserTemplateCreate
+  sample_data: string
+  max_records?: number
+}
+
+export interface PredictionItem {
+  type: string
+  label: string
+  score: number | null
+  data: Record<string, unknown>
+}
+
+export interface Prediction {
+  image_key: string
+  predictions: PredictionItem[]
+}
+
+export interface ParseTestResponse {
+  success: boolean
+  records_parsed: number
+  predictions: Prediction[]
+  errors: Array<{ line?: number; error: string }>
+}
+
+export const parserTemplatesApi = {
+  list: () => api.get<ParserTemplate[]>('/parser-templates').then((r) => r.data),
+  get: (id: number) => api.get<ParserTemplate>(`/parser-templates/${id}`).then((r) => r.data),
+  create: (data: ParserTemplateCreate) =>
+    api.post<ParserTemplate>('/parser-templates', data).then((r) => r.data),
+  update: (id: number, data: Partial<ParserTemplateCreate>) =>
+    api.put<ParserTemplate>(`/parser-templates/${id}`, data).then((r) => r.data),
+  delete: (id: number) => api.delete(`/parser-templates/${id}`),
+  test: (data: ParseTestRequest) =>
+    api.post<ParseTestResponse>('/parser-templates/test', data).then((r) => r.data),
+}
+
 export default api
 
