@@ -3,28 +3,7 @@
  * Stores image Blobs for offline access and faster repeat loads
  */
 
-import { openDB, DBSchema, IDBPDatabase } from 'idb'
-
-interface ImageCacheDB extends DBSchema {
-  images: {
-    key: string
-    value: {
-      url: string
-      blob: Blob
-      size: number
-      accessed: number
-      cached: number
-    }
-    indexes: { 'accessed': number; 'size': number }
-  }
-  metadata: {
-    key: string
-    value: {
-      totalSize: number
-      itemCount: number
-    }
-  }
-}
+import { openDB, type IDBPDatabase } from 'idb'
 
 const DB_NAME = 'labelhub-image-cache'
 const DB_VERSION = 1

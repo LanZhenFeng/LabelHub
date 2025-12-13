@@ -109,7 +109,7 @@ export const datasetsApi = {
   delete: (datasetId: number) => api.delete(`/datasets/${datasetId}`),
   scan: (datasetId: number, data?: { glob?: string; limit?: number }) =>
     api.post<ScanResponse>(`/datasets/${datasetId}/scan`, data || {}).then((r) => r.data),
-  export: async (datasetId: number, format: 'coco' | 'yolo' | 'voc', includeImages: boolean = false) => {
+  export: async (datasetId: number, format: 'coco' | 'yolo' | 'voc' | 'csv' | 'json' | 'imagenet', includeImages: boolean = false) => {
     const response = await api.post(`/datasets/${datasetId}/export?format=${format}&include_images=${includeImages}`, null, {
       responseType: 'blob',
     })
