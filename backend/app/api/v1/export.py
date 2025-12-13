@@ -133,6 +133,9 @@ async def export_dataset(
         )
     
     except Exception as e:
+        import traceback
+        error_detail = f"Export failed: {str(e)}\n{traceback.format_exc()}"
+        print(f"[EXPORT ERROR] {error_detail}")  # Debug log
         raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
 
 
