@@ -39,7 +39,7 @@ export function useImagePrefetch(
     // 检查网络连接类型
     let effectivePrefetchCount = prefetchCount
     if (bandwidthAware && 'connection' in navigator) {
-      const connection = (navigator as any).connection
+      const connection = (navigator as Navigator & { connection?: { effectiveType?: string; downlink?: number } }).connection
       if (connection) {
         const effectiveType = connection.effectiveType // '4g', '3g', '2g', 'slow-2g'
         const downlink = connection.downlink // Mbps
@@ -112,12 +112,20 @@ export function getNetworkInfo() {
     }
   }
 
-  const connection = (navigator as any).connection
+  const connection = (navigator as Navigator & {
+    connection?: {
+      effectiveType?: string
+      downlink?: number
+      rtt?: number
+      saveData?: boolean
+    }
+  }).connection
+  
   return {
-    effectiveType: connection.effectiveType || 'unknown', // '4g', '3g', '2g', 'slow-2g'
-    downlink: connection.downlink, // Mbps
-    rtt: connection.rtt, // ms
-    saveData: connection.saveData || false, // 用户是否启用了数据节省模式
+    effectiveType: connection?.effectiveType || 'unknown', // '4g', '3g', '2g', 'slow-2g'
+    downlink: connection?.downlink, // Mbps
+    rtt: connection?.rtt, // ms
+    saveData: connection?.saveData || false, // 用户是否启用了数据节省模式
   }
 }
 
