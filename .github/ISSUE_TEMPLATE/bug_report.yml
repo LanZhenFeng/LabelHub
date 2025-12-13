@@ -1,0 +1,111 @@
+name: 🐛 Bug Report
+description: 报告一个 Bug
+title: "[Bug]: "
+labels: ["bug", "triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢你提交 Bug 报告！请尽可能详细地填写以下信息，帮助我们快速定位问题。
+
+  - type: checkboxes
+    id: existing-issue
+    attributes:
+      label: 已有 Issue 检查
+      description: 提交前请先搜索是否已有相关 Issue
+      options:
+        - label: 我已搜索现有 Issue，没有发现重复问题
+          required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug 描述
+      description: 清晰简洁地描述这个 Bug
+      placeholder: 告诉我们发生了什么...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤
+      description: 如何复现这个问题？
+      placeholder: |
+        1. 打开 '...'
+        2. 点击 '...'
+        3. 滚动到 '...'
+        4. 看到错误
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为
+      description: 你期望发生什么？
+      placeholder: 描述期望的正确行为...
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为
+      description: 实际发生了什么？
+      placeholder: 描述实际观察到的行为...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: 影响模块
+      description: 这个 Bug 影响哪个模块？
+      options:
+        - Backend (FastAPI)
+        - Frontend (React)
+        - Canvas / 标注工具
+        - Parser Template
+        - 其他
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: 环境信息
+      description: 请提供你的环境信息
+      placeholder: |
+        - OS: [e.g., macOS 14.0, Windows 11, Ubuntu 22.04]
+        - Browser: [e.g., Chrome 120, Firefox 121]
+        - LabelHub Version: [e.g., v1.0.0]
+        - Node.js Version: [e.g., 20.10.0]
+        - Python Version: [e.g., 3.11.5]
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志/错误信息
+      description: 如有相关日志或错误堆栈，请粘贴在此
+      placeholder: 粘贴日志或错误信息...
+      render: shell
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: 截图
+      description: 如有截图可以帮助说明问题，请在此添加
+      placeholder: 拖拽图片到这里上传...
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: 其他信息
+      description: 其他可能有帮助的信息
+      placeholder: 任何其他相关信息...
