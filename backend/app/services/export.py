@@ -186,8 +186,8 @@ class ExportService:
         items_query = (
             select(Item)
             .options(
-                selectinload(Item.bbox_annotations),
-                selectinload(Item.polygon_annotations),
+                selectinload(Item.bboxes),
+                selectinload(Item.polygons),
                 selectinload(Item.classifications),
             )
             .where(Item.dataset_id == dataset_id)
@@ -231,7 +231,7 @@ class ExportService:
             })
 
             # Add bbox annotations
-            for bbox in item.bbox_annotations:
+            for bbox in item.bboxes:
                 coco["annotations"].append({
                     "id": annotation_id,
                     "image_id": image_id,
@@ -243,7 +243,7 @@ class ExportService:
                 annotation_id += 1
 
             # Add polygon annotations (segmentation)
-            for polygon in item.polygon_annotations:
+            for polygon in item.polygons:
                 # Flatten points: [[x1,y1],[x2,y2]] -> [x1,y1,x2,y2]
                 segmentation = [coord for point in polygon.points for coord in point]
                 
@@ -312,7 +312,7 @@ class ExportService:
 
         items_query = (
             select(Item)
-            .options(selectinload(Item.bbox_annotations))
+            .options(selectinload(Item.bboxes))
             .where(Item.dataset_id == dataset_id)
             .where(Item.status.in_(status_filter))
         )
@@ -333,7 +333,7 @@ class ExportService:
             
             # Write labels for each image
             for item in items:
-                if not item.bbox_annotations:
+                if not item.bboxes:
                     continue
                 
                 # YOLO format requires image dimensions
@@ -341,7 +341,7 @@ class ExportService:
                 img_height = item.height or 1080
                 
                 lines = []
-                for bbox in item.bbox_annotations:
+                for bbox in item.bboxes:
                     class_id = label_id_map[bbox.label_id]
                     # Convert to YOLO format (normalized center coordinates)
                     x_center = (bbox.x + bbox.width / 2) / img_width
@@ -389,7 +389,7 @@ class ExportService:
 
         items_query = (
             select(Item)
-            .options(selectinload(Item.bbox_annotations))
+            .options(selectinload(Item.bboxes))
             .where(Item.dataset_id == dataset_id)
             .where(Item.status.in_(status_filter))
         )
@@ -405,7 +405,7 @@ class ExportService:
         
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
             for item in items:
-                if not item.bbox_annotations:
+                if not item.bboxes:
                     continue
                 
                 # Create XML annotation
@@ -429,7 +429,7 @@ class ExportService:
                 depth.text = '3'
                 
                 # Objects
-                for bbox in item.bbox_annotations:
+                for bbox in item.bboxes:
                     obj = SubElement(annotation, 'object')
                     
                     name = SubElement(obj, 'name')
