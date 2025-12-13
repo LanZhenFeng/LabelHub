@@ -104,7 +104,7 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex items-center gap-4">
         <Button asChild variant="ghost" size="icon">
-          <Link to={`/projects/${projectId}`}>
+          <Link to="/projects">
             <ArrowLeft className="w-5 h-5" />
           </Link>
         </Button>
