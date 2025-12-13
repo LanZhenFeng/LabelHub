@@ -423,7 +423,10 @@ export default function AnnotatePage() {
           <Card className="m-4 mt-0 p-3 bg-muted/50">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Keyboard className="w-4 h-4" />
-              <span>1-9: Select label | Enter: Submit | Space: Next | S: Skip</span>
+              <div className="flex flex-col gap-1">
+                <span>1-9: Label | Enter: Submit | S: Skip</span>
+                <span>←/→: Prev/Next | Scroll: Zoom | Space+Drag: Pan</span>
+              </div>
             </div>
           </Card>
         </aside>

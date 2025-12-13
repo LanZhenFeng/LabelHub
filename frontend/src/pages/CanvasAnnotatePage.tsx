@@ -598,34 +598,38 @@ export default function CanvasAnnotatePage() {
               <h4 className="font-medium mb-2">View</h4>
               <div className="space-y-1 text-sm">
                 <div className="flex justify-between">
-                  <span>Zoom In</span>
-                  <kbd className="px-2 py-0.5 bg-muted rounded">+ / Scroll</kbd>
+                  <span>Zoom</span>
+                  <kbd className="px-2 py-0.5 bg-muted rounded">Scroll</kbd>
                 </div>
                 <div className="flex justify-between">
-                  <span>Zoom Out</span>
-                  <kbd className="px-2 py-0.5 bg-muted rounded">- / Scroll</kbd>
+                  <span>Pan</span>
+                  <kbd className="px-2 py-0.5 bg-muted rounded">Space+Drag</kbd>
                 </div>
                 <div className="flex justify-between">
-                  <span>Reset Zoom</span>
-                  <kbd className="px-2 py-0.5 bg-muted rounded">0</kbd>
+                  <span>Reset View</span>
+                  <kbd className="px-2 py-0.5 bg-muted rounded">Dbl-click</kbd>
                 </div>
               </div>
             </div>
 
             <div className="col-span-2">
               <h4 className="font-medium mb-2">Actions</h4>
-              <div className="space-y-1 text-sm">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
                 <div className="flex justify-between">
-                  <span>Save</span>
+                  <span>Previous Item</span>
+                  <kbd className="px-2 py-0.5 bg-muted rounded">←</kbd>
+                </div>
+                <div className="flex justify-between">
+                  <span>Next Item</span>
+                  <kbd className="px-2 py-0.5 bg-muted rounded">→</kbd>
+                </div>
+                <div className="flex justify-between">
+                  <span>Save Draft</span>
                   <kbd className="px-2 py-0.5 bg-muted rounded">Ctrl+S</kbd>
                 </div>
                 <div className="flex justify-between">
                   <span>Submit & Next</span>
-                  <kbd className="px-2 py-0.5 bg-muted rounded">Enter / Right-click</kbd>
-                </div>
-                <div className="flex justify-between">
-                  <span>Previous Item</span>
-                  <kbd className="px-2 py-0.5 bg-muted rounded">← / Esc</kbd>
+                  <kbd className="px-2 py-0.5 bg-muted rounded">Enter</kbd>
                 </div>
                 <div className="flex justify-between">
                   <span>Skip Item</span>
@@ -633,7 +637,7 @@ export default function CanvasAnnotatePage() {
                 </div>
                 <div className="flex justify-between">
                   <span>Delete Item</span>
-                  <kbd className="px-2 py-0.5 bg-muted rounded">Ctrl+Delete</kbd>
+                  <kbd className="px-2 py-0.5 bg-muted rounded">Ctrl+Del</kbd>
                 </div>
                 <div className="flex justify-between">
                   <span>Show Help</span>
@@ -643,11 +647,11 @@ export default function CanvasAnnotatePage() {
             </div>
 
             <div className="col-span-2">
-              <h4 className="font-medium mb-2">Drawing</h4>
+              <h4 className="font-medium mb-2">Drawing Tips</h4>
               <div className="space-y-1 text-sm text-muted-foreground">
-                <p>• Rectangle: Click and drag to draw</p>
-                <p>• Polygon: Click to add points, double-click to close</p>
-                <p>• Right-click: Submit current item</p>
+                <p>• Rectangle: Click and drag to draw a bounding box</p>
+                <p>• Polygon: Click to add vertices, double-click or Enter to close</p>
+                <p>• Select tool (V) to move, resize, or delete annotations</p>
               </div>
             </div>
           </div>

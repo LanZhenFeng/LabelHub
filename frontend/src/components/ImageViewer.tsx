@@ -233,7 +233,7 @@ export function ImageViewer({ imageUrl, className }: ImageViewerProps) {
     <div className={className}>
       {/* Toolbar */}
       <div className="flex items-center gap-2 px-4 py-2 bg-card border-b">
-        <span className="text-sm text-muted-foreground">Zoom:</span>
+        <span className="text-sm text-muted-foreground"></span>
         <Button variant="ghost" size="sm" onClick={handleZoomOut} title="Zoom Out (-)">
           <ZoomOut className="w-4 h-4" />
         </Button>
