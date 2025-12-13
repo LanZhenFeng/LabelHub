@@ -326,34 +326,48 @@ class StatsService:
 
         distribution: dict[str, int] = defaultdict(int)
 
-        # Query classification annotations
+        # Query classification annotations (uses 'label' string field, not label_id)
         cls_query = select(
-            ClassificationAnnotation.label_id,
+            ClassificationAnnotation.label,
             func.count(ClassificationAnnotation.id),
-        ).where(ClassificationAnnotation.project_id == project_id)
+        )
 
         if dataset_id:
-            # Join with Item to filter by dataset
+            # Filter by specific dataset
             cls_query = cls_query.join(
                 Item, ClassificationAnnotation.item_id == Item.id
             ).where(Item.dataset_id == dataset_id)
+        else:
+            # Filter by project (join through Item -> Dataset)
+            cls_query = cls_query.join(
+                Item, ClassificationAnnotation.item_id == Item.id
+            ).join(
+                Dataset, Item.dataset_id == Dataset.id
+            ).where(Dataset.project_id == project_id)
 
-        cls_query = cls_query.group_by(ClassificationAnnotation.label_id)
+        cls_query = cls_query.group_by(ClassificationAnnotation.label)
 
         cls_result = await db.execute(cls_query)
-        for label_id, count in cls_result.all():
-            label_name = labels.get(label_id, "Unknown")
+        for label_name, count in cls_result.all():
             distribution[label_name] += count
 
-        # Query bbox annotations
+        # Query bbox annotations (has label_id)
         bbox_query = select(
             BBoxAnnotation.label_id, func.count(BBoxAnnotation.id)
-        ).where(BBoxAnnotation.project_id == project_id)
+        )
 
         if dataset_id:
+            # Filter by specific dataset
             bbox_query = bbox_query.join(Item, BBoxAnnotation.item_id == Item.id).where(
                 Item.dataset_id == dataset_id
             )
+        else:
+            # Filter by project (join through Item -> Dataset)
+            bbox_query = bbox_query.join(
+                Item, BBoxAnnotation.item_id == Item.id
+            ).join(
+                Dataset, Item.dataset_id == Dataset.id
+            ).where(Dataset.project_id == project_id)
 
         bbox_query = bbox_query.group_by(BBoxAnnotation.label_id)
 
@@ -362,15 +376,23 @@ class StatsService:
             label_name = labels.get(label_id, "Unknown")
             distribution[label_name] += count
 
-        # Query polygon annotations
+        # Query polygon annotations (has label_id)
         poly_query = select(
             PolygonAnnotation.label_id, func.count(PolygonAnnotation.id)
-        ).where(PolygonAnnotation.project_id == project_id)
+        )
 
         if dataset_id:
+            # Filter by specific dataset
             poly_query = poly_query.join(
                 Item, PolygonAnnotation.item_id == Item.id
             ).where(Item.dataset_id == dataset_id)
+        else:
+            # Filter by project (join through Item -> Dataset)
+            poly_query = poly_query.join(
+                Item, PolygonAnnotation.item_id == Item.id
+            ).join(
+                Dataset, Item.dataset_id == Dataset.id
+            ).where(Dataset.project_id == project_id)
 
         poly_query = poly_query.group_by(PolygonAnnotation.label_id)
 
