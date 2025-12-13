@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Plus, FolderOpen, Trash2, MoreVertical, ImageIcon, BarChart3 } from 'lucide-react'
+import { Plus, FolderOpen, Trash2, ImageIcon, BarChart3 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -344,16 +344,11 @@ function ProjectCard({
   return (
     <Card className="group hover:shadow-md transition-shadow">
       <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div>
-            <CardTitle className="text-lg">{project.name}</CardTitle>
-            <CardDescription className="mt-1">
-              {project.task_type.charAt(0).toUpperCase() + project.task_type.slice(1)}
-            </CardDescription>
-          </div>
-          <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100">
-            <MoreVertical className="w-4 h-4" />
-          </Button>
+        <div>
+          <CardTitle className="text-lg">{project.name}</CardTitle>
+          <CardDescription className="mt-1">
+            {project.task_type.charAt(0).toUpperCase() + project.task_type.slice(1)}
+          </CardDescription>
         </div>
         {/* Labels */}
         <div className="flex flex-wrap gap-1 mt-2">

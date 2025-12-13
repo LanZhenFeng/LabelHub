@@ -1,10 +1,9 @@
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { cn } from '@/lib/utils'
-import { FolderKanban, LayoutDashboard, Settings, Tags } from 'lucide-react'
+import { FolderKanban, Settings, Tags } from 'lucide-react'
 
 const navItems = [
   { href: '/projects', label: 'Projects', icon: FolderKanban },
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, disabled: true },
   { href: '/settings', label: 'Settings', icon: Settings, disabled: true },
 ]
 
@@ -44,7 +43,7 @@ export default function Layout() {
                 <Icon className="w-5 h-5" />
                 {item.label}
                 {item.disabled && (
-                  <span className="ml-auto text-xs bg-muted px-1.5 py-0.5 rounded">M3</span>
+                  <span className="ml-auto text-xs bg-muted px-1.5 py-0.5 rounded">v1.1</span>
                 )}
               </Link>
             )
