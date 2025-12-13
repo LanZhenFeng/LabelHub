@@ -56,21 +56,21 @@ export default function DatasetPage() {
     enabled: !!datasetId,
   })
 
-  // 只对单页大量图片使用虚拟列表（超过100张）
+  // 每页100张图片，平衡加载速度和分页次数
   const { data: itemsData, isLoading: itemsLoading } = useQuery({
     queryKey: ['items', datasetId, statusFilter, page],
     queryFn: () =>
       itemsApi.list(Number(datasetId), {
         status: statusFilter === 'all' ? undefined : statusFilter,
         page,
-        page_size: 50,
+        page_size: 100, // 增加到100张以减少分页操作
       }),
     enabled: !!datasetId,
   })
 
-  // 决定是否使用虚拟列表
+  // 决定是否使用虚拟列表（超过50张就启用）
   useEffect(() => {
-    if (itemsData && itemsData.items.length > 100) {
+    if (itemsData && itemsData.items.length > 50) {
       setUseVirtual(true)
     } else {
       setUseVirtual(false)
