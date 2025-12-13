@@ -7,7 +7,6 @@ import {
   Settings,
   Eye,
   Check,
-  X,
   AlertCircle,
   ChevronLeft,
   FileCode,
@@ -31,7 +30,6 @@ import {
   type ParseTestResponse,
   datasetsApi,
 } from '@/lib/api'
-import { cn } from '@/lib/utils'
 
 export default function ImportPage() {
   const { datasetId } = useParams<{ datasetId: string }>()
@@ -169,290 +167,255 @@ export default function ImportPage() {
         </div>
       </div>
 
-      {/* Three Column Layout */}
-      <div className="container mx-auto px-4 py-6">
-        <div className="grid grid-cols-12 gap-6">
-          {/* Column 1: File Upload */}
-          <div className="col-span-3">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Upload className="h-5 w-5" />
-                  数据文件
-                </CardTitle>
-                <CardDescription>上传或粘贴标注数据</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* File Upload */}
-                <div>
-                  <Label htmlFor="file-upload" className="cursor-pointer">
-                    <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 hover:border-primary/50 transition-colors text-center">
-                      <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                      <p className="text-sm font-medium">点击上传文件</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        支持 JSON, JSONL 格式
+      {/* Split Layout */}
+      <div className="flex-1 overflow-hidden">
+        <div className="container mx-auto px-4 py-6 h-full">
+          <div className="flex gap-6 h-full">
+            {/* Sidebar: Configuration */}
+            <div className="w-[400px] flex-shrink-0 flex flex-col gap-6 overflow-y-auto pb-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Upload className="h-4 w-4" />
+                    数据源配置
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* File Upload */}
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-2 block">上传文件</Label>
+                    <div className="relative">
+                      <Input
+                        id="file-upload"
+                        type="file"
+                        accept=".json,.jsonl,.txt"
+                        className="hidden"
+                        onChange={handleFileUpload}
+                      />
+                      <Label
+                        htmlFor="file-upload"
+                        className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
+                      >
+                        <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                        <span className="text-sm text-muted-foreground">点击上传文件</span>
+                        <span className="text-xs text-muted-foreground/50 mt-1">JSON, JSONL</span>
+                      </Label>
+                    </div>
+                  </div>
+
+                  {/* Textarea */}
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-2 block">或粘贴文本</Label>
+                    <Textarea
+                      placeholder="在此处粘贴 JSON 数据..."
+                      value={sampleData}
+                      onChange={(e) => setSampleData(e.target.value)}
+                      className="font-mono text-xs min-h-[120px] resize-y"
+                    />
+                    <div className="flex justify-between items-center mt-1">
+                       <span className="text-[10px] text-muted-foreground">
+                        {sampleData ? `${sampleData.length} 字符` : '暂无数据'}
+                      </span>
+                      {sampleData && (
+                        <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setSampleData('')}>
+                          清空
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                   <CardTitle className="flex items-center gap-2 text-base">
+                    <Settings className="h-4 w-4" />
+                    解析规则
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">选择模板</Label>
+                    <Select
+                      value={selectedTemplateId?.toString()}
+                      onValueChange={(v) => setSelectedTemplateId(Number(v))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="选择解析模板" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {templatesLoading ? (
+                          <SelectItem value="loading" disabled>加载中...</SelectItem>
+                        ) : templates.length === 0 ? (
+                          <SelectItem value="empty" disabled>暂无模板</SelectItem>
+                        ) : (
+                          templates.map((tpl) => (
+                            <SelectItem key={tpl.id} value={tpl.id.toString()}>
+                              <div className="flex items-center gap-2">
+                                {tpl.is_builtin && <Badge variant="secondary" className="text-[10px] h-4 px-1">内置</Badge>}
+                                <span>{tpl.name}</span>
+                              </div>
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {selectedTemplate && (
+                    <div className="rounded-md bg-muted/50 p-3 space-y-3">
+                      <div className="flex items-start justify-between">
+                         <div className="space-y-1">
+                           <p className="text-sm font-medium">{selectedTemplate.name}</p>
+                           <p className="text-xs text-muted-foreground">{selectedTemplate.description || '无描述'}</p>
+                         </div>
+                         <Badge variant="outline" className="text-[10px]">{selectedTemplate.input_type.toUpperCase()}</Badge>
+                      </div>
+                      
+                      <div className="space-y-1.5">
+                        <Label className="text-[10px] text-muted-foreground uppercase">Mapping Config</Label>
+                        <div className="bg-background border rounded p-2 overflow-x-auto">
+                          <pre className="text-[10px] font-mono leading-relaxed">
+                            {JSON.stringify(selectedTemplate.mapping, null, 2)}
+                          </pre>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <Button
+                    onClick={handleTest}
+                    disabled={!sampleData || testMutation.isPending}
+                    className="w-full"
+                  >
+                    {testMutation.isPending ? (
+                      <>
+                        <div className="h-3 w-3 mr-2 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        解析中...
+                      </>
+                    ) : (
+                      <>
+                        <FileCode className="h-4 w-4 mr-2" />
+                        测试解析
+                      </>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Main Content: Preview */}
+            <div className="flex-1 flex flex-col min-w-0 h-full">
+              <Card className="flex-1 flex flex-col overflow-hidden border-dashed shadow-none bg-muted/20">
+                <CardHeader className="flex-shrink-0 bg-background border-b py-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <Eye className="h-5 w-5" />
+                        解析预览
+                      </CardTitle>
+                      <CardDescription className="mt-1">
+                        {testResult 
+                          ? `成功解析 ${testResult.records_parsed} 条记录，当前预览前 ${testResult.predictions.length} 条`
+                          : '请先配置数据源和模板进行测试'}
+                      </CardDescription>
+                    </div>
+                    {testResult && (
+                       <div className="flex items-center gap-3">
+                         <div className="flex flex-col items-end">
+                            <span className="text-sm font-medium text-green-600">
+                              {testResult.predictions.length} 成功
+                            </span>
+                            {testResult.errors.length > 0 && (
+                              <span className="text-xs text-destructive">
+                                {testResult.errors.length} 错误
+                              </span>
+                            )}
+                         </div>
+                       </div>
+                    )}
+                  </div>
+                </CardHeader>
+                
+                <CardContent className="flex-1 overflow-y-auto p-0 bg-background">
+                  {!testResult ? (
+                    <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-8">
+                      <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+                        <FileText className="h-8 w-8 opacity-40" />
+                      </div>
+                      <p className="font-medium">暂无预览数据</p>
+                      <p className="text-sm opacity-60 mt-1 max-w-xs text-center">
+                        在左侧上传数据文件并选择解析模板，点击“测试解析”查看结果。
                       </p>
                     </div>
-                  </Label>
-                  <Input
-                    id="file-upload"
-                    type="file"
-                    accept=".json,.jsonl,.txt"
-                    className="hidden"
-                    onChange={handleFileUpload}
-                  />
-                </div>
-
-                {/* Or Paste */}
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card px-2 text-muted-foreground">或</span>
-                  </div>
-                </div>
-
-                {/* Textarea */}
-                <div>
-                  <Label htmlFor="sample-data">粘贴数据</Label>
-                  <Textarea
-                    id="sample-data"
-                    placeholder="粘贴 JSON 或 JSONL 数据..."
-                    value={sampleData}
-                    onChange={(e) => setSampleData(e.target.value)}
-                    className="font-mono text-xs min-h-[300px]"
-                  />
-                  <p className="text-xs text-muted-foreground mt-2">
-                    {sampleData ? `${sampleData.length} 字符` : '暂无数据'}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Column 2: Template Selection & Editor */}
-          <div className="col-span-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Settings className="h-5 w-5" />
-                  解析模板
-                </CardTitle>
-                <CardDescription>选择或编辑解析规则</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Template Selection */}
-                <div>
-                  <Label htmlFor="template-select">选择模板</Label>
-                  <Select
-                    value={selectedTemplateId?.toString()}
-                    onValueChange={(v) => setSelectedTemplateId(Number(v))}
-                  >
-                    <SelectTrigger id="template-select">
-                      <SelectValue placeholder="选择解析模板" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {templatesLoading ? (
-                        <SelectItem value="loading" disabled>
-                          加载中...
-                        </SelectItem>
-                      ) : templates.length === 0 ? (
-                        <SelectItem value="empty" disabled>
-                          暂无模板
-                        </SelectItem>
-                      ) : (
-                        templates.map((tpl) => (
-                          <SelectItem key={tpl.id} value={tpl.id.toString()}>
-                            <div className="flex items-center gap-2">
-                              {tpl.is_builtin && (
-                                <Badge variant="secondary" className="text-xs">
-                                  内置
-                                </Badge>
-                              )}
-                              <span>{tpl.name}</span>
-                            </div>
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Template Info */}
-                {selectedTemplate && (
-                  <div className="space-y-4">
-                    <div>
-                      <Label>模板信息</Label>
-                      <div className="mt-2 space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">名称:</span>
-                          <span className="font-medium">{selectedTemplate.name}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">类型:</span>
-                          <Badge variant="outline" className="text-xs">
-                            {selectedTemplate.input_type.toUpperCase()}
-                          </Badge>
-                        </div>
-                        {selectedTemplate.description && (
-                          <div>
-                            <span className="text-muted-foreground">描述:</span>
-                            <p className="text-xs mt-1">{selectedTemplate.description}</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Mapping Preview */}
-                    <div>
-                      <Label>映射配置 (JMESPath)</Label>
-                      <div className="mt-2 border rounded-lg p-3 bg-muted/30">
-                        <pre className="text-xs font-mono overflow-x-auto whitespace-pre-wrap break-words">
-                          {JSON.stringify(selectedTemplate.mapping, null, 2)}
-                        </pre>
-                      </div>
-                    </div>
-
-                    {/* Test Button */}
-                    <Button
-                      onClick={handleTest}
-                      disabled={!sampleData || testMutation.isPending}
-                      className="w-full"
-                    >
-                      {testMutation.isPending ? (
-                        <>
-                          <div className="h-4 w-4 mr-2 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                          测试解析...
-                        </>
-                      ) : (
-                        <>
-                          <FileCode className="h-4 w-4 mr-2" />
-                          测试解析
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Column 3: Preview & Errors */}
-          <div className="col-span-5">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Eye className="h-5 w-5" />
-                  解析预览
-                </CardTitle>
-                <CardDescription>
-                  {testResult
-                    ? `解析 ${testResult.records_parsed} 条记录`
-                    : '暂无预览结果'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {!testResult ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <FileText className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                    <p>请上传数据并测试解析</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {/* Success/Error Summary */}
-                    <div
-                      className={cn(
-                        'flex items-center gap-2 p-3 rounded-lg',
-                        testResult.success
-                          ? 'bg-green-500/10 text-green-700 dark:text-green-400'
-                          : 'bg-destructive/10 text-destructive'
-                      )}
-                    >
-                      {testResult.success ? (
-                        <Check className="h-5 w-5" />
-                      ) : (
-                        <X className="h-5 w-5" />
-                      )}
-                      <div className="flex-1">
-                        <p className="font-medium">
-                          {testResult.success ? '解析成功' : '解析失败'}
-                        </p>
-                        <p className="text-xs mt-1">
-                          成功: {testResult.predictions.length} / 错误:{' '}
-                          {testResult.errors.length}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Errors */}
-                    {testResult.errors.length > 0 && (
-                      <div className="space-y-2">
-                        <Label className="text-destructive">错误信息</Label>
-                        <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                          {testResult.errors.map((err, idx) => (
-                            <div
-                              key={idx}
-                              className="flex gap-2 p-2 bg-destructive/10 rounded text-sm"
-                            >
-                              <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
-                              <div className="flex-1">
-                                {err.line !== undefined && (
-                                  <span className="font-mono text-xs text-muted-foreground">
-                                    行 {err.line}:
-                                  </span>
-                                )}
-                                <span className="ml-1">{err.error}</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Predictions Preview */}
-                    {testResult.predictions.length > 0 && (
-                      <div className="space-y-2">
-                        <Label>预测结果预览 (前 {testResult.predictions.length} 条)</Label>
-                        <div className="space-y-3 max-h-[500px] overflow-y-auto">
-                          {testResult.predictions.map((pred, idx) => (
-                            <div key={idx} className="border rounded-lg p-3 space-y-2">
-                              <div className="flex items-center justify-between">
-                                <span className="font-medium text-sm">
-                                  {pred.image_key}
+                  ) : (
+                    <div className="divide-y">
+                      {/* Errors Section */}
+                      {testResult.errors.length > 0 && (
+                        <div className="p-4 bg-destructive/5">
+                          <h4 className="text-sm font-medium text-destructive mb-3 flex items-center gap-2">
+                            <AlertCircle className="h-4 w-4" />
+                            解析错误 ({testResult.errors.length})
+                          </h4>
+                          <div className="space-y-2">
+                            {testResult.errors.map((err, idx) => (
+                              <div key={idx} className="flex gap-2 text-sm bg-background p-2 rounded border border-destructive/20 text-destructive-foreground">
+                                <span className="font-mono text-xs opacity-70 flex-shrink-0 pt-0.5">
+                                  {err.line !== undefined ? `Line ${err.line}` : 'Global'}
                                 </span>
-                                <Badge variant="outline" className="text-xs">
-                                  {pred.predictions.length} 个标注
-                                </Badge>
+                                <span>{err.error}</span>
                               </div>
-                              <div className="space-y-1">
-                                {pred.predictions.map((item, itemIdx) => (
-                                  <div
-                                    key={itemIdx}
-                                    className="flex items-center gap-2 text-xs bg-muted/30 rounded p-2"
-                                  >
-                                    <Badge className="text-xs">{item.type}</Badge>
-                                    <span className="font-medium">{item.label}</span>
-                                    {item.score !== null && (
-                                      <span className="text-muted-foreground">
-                                        {(item.score * 100).toFixed(1)}%
-                                      </span>
-                                    )}
-                                    <code className="ml-auto text-xs text-muted-foreground">
-                                      {JSON.stringify(item.data).substring(0, 50)}...
-                                    </code>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                      )}
+
+                      {/* Success List */}
+                      {testResult.predictions.length > 0 ? (
+                         <div className="p-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                           {testResult.predictions.map((pred, idx) => (
+                             <Card key={idx} className="overflow-hidden hover:border-primary/50 transition-colors">
+                               <div className="bg-muted/30 p-3 border-b flex items-center justify-between">
+                                  <span className="font-mono text-xs font-medium truncate max-w-[180px]" title={pred.image_key}>
+                                    {pred.image_key}
+                                  </span>
+                                  <Badge variant="secondary" className="text-[10px]">
+                                    {pred.predictions.length} items
+                                  </Badge>
+                               </div>
+                               <div className="p-3 max-h-[200px] overflow-y-auto space-y-2">
+                                 {pred.predictions.map((item, itemIdx) => (
+                                   <div key={itemIdx} className="text-xs space-y-1 pb-2 border-b last:border-0 last:pb-0 border-dashed">
+                                     <div className="flex items-center justify-between">
+                                       <Badge variant="outline" className="text-[10px] px-1 h-4">{item.type}</Badge>
+                                       {item.score !== null && (
+                                         <span className="text-muted-foreground text-[10px]">
+                                           {(item.score * 100).toFixed(0)}%
+                                         </span>
+                                       )}
+                                     </div>
+                                     <div className="font-medium truncate" title={item.label}>
+                                       {item.label}
+                                     </div>
+                                     <div className="text-[10px] text-muted-foreground font-mono truncate opacity-70">
+                                       {JSON.stringify(item.data)}
+                                     </div>
+                                   </div>
+                                 ))}
+                               </div>
+                             </Card>
+                           ))}
+                         </div>
+                      ) : (
+                         <div className="p-8 text-center text-sm text-muted-foreground">
+                            没有成功解析的预测结果
+                         </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
       </div>

@@ -11,6 +11,7 @@ from app.api.v1 import (
     projects,
     export as export_router,
     parser_templates,
+    stats,
 )
 
 router = APIRouter(prefix="/api/v1")
@@ -23,4 +24,5 @@ router.include_router(labels.router, tags=["Labels"])
 router.include_router(annotations.router, tags=["Annotations"])
 router.include_router(export_router.router, tags=["Export"])
 router.include_router(parser_templates.router, tags=["Parser Templates"])
+router.include_router(stats.router, tags=["Statistics"])
 

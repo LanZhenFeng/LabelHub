@@ -230,30 +230,23 @@ export function ImageViewer({ imageUrl, className }: ImageViewerProps) {
   }, [isSpacePressed])
 
   return (
-    <div className={className}>
-      {/* Toolbar */}
-      <div className="flex items-center gap-2 px-4 py-2 bg-card border-b">
-        <span className="text-sm text-muted-foreground"></span>
-        <Button variant="ghost" size="sm" onClick={handleZoomOut} title="Zoom Out (-)">
-          <ZoomOut className="w-4 h-4" />
-        </Button>
-        <span className="text-xs text-muted-foreground min-w-[50px] text-center">
-          {Math.round(zoom * 100)}%
-        </span>
-        <Button variant="ghost" size="sm" onClick={handleZoomIn} title="Zoom In (+)">
-          <ZoomIn className="w-4 h-4" />
-        </Button>
-        <Button variant="ghost" size="sm" onClick={handleResetZoom} title="Reset Zoom (0)">
-          <Maximize className="w-4 h-4" />
-        </Button>
-      </div>
-
+    <div className={cn("relative h-full flex flex-col", className)}>
       {/* Canvas */}
       <div
         ref={containerRef}
-        className={cn("flex-1 bg-black/5", isSpacePressed ? "cursor-grab" : isPanning ? "cursor-grabbing" : "cursor-default")}
-        style={{ width: '100%', height: 'calc(100% - 48px)' }}
+        className={cn(
+          "flex-1 bg-muted/30 relative overflow-hidden",
+          isSpacePressed ? "cursor-grab" : isPanning ? "cursor-grabbing" : "cursor-default"
+        )}
       >
+        {/* Background Grid Pattern */}
+        <div className="absolute inset-0 pointer-events-none opacity-[0.03]"
+          style={{
+            backgroundImage: `radial-gradient(#000 1px, transparent 1px)`,
+            backgroundSize: '20px 20px'
+          }}
+        />
+        
         <canvas
           ref={canvasRef}
           onMouseDown={handleMouseDown}
@@ -263,6 +256,41 @@ export function ImageViewer({ imageUrl, className }: ImageViewerProps) {
           onContextMenu={(e) => e.preventDefault()}
           style={{ display: 'block' }}
         />
+
+        {/* Floating Toolbar */}
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-1 p-1.5 rounded-full bg-background/80 backdrop-blur border shadow-sm">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8 rounded-full hover:bg-muted"
+            onClick={handleZoomOut} 
+            title="Zoom Out (-)"
+          >
+            <ZoomOut className="w-4 h-4" />
+          </Button>
+          <span className="text-xs font-medium w-12 text-center select-none tabular-nums">
+            {Math.round(zoom * 100)}%
+          </span>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8 rounded-full hover:bg-muted"
+            onClick={handleZoomIn} 
+            title="Zoom In (+)"
+          >
+            <ZoomIn className="w-4 h-4" />
+          </Button>
+          <div className="w-px h-4 bg-border mx-1" />
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8 rounded-full hover:bg-muted"
+            onClick={handleResetZoom} 
+            title="Reset Zoom (0)"
+          >
+            <Maximize className="w-3.5 h-3.5" />
+          </Button>
+        </div>
       </div>
     </div>
   )
