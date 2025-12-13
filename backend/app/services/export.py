@@ -259,6 +259,7 @@ class ExportService:
         )
         result = await db.execute(query)
         dataset = result.scalar_one()
+        project = dataset.project
 
         items_query = (
             select(Item)
@@ -268,6 +269,9 @@ class ExportService:
         )
         result = await db.execute(items_query)
         items = result.scalars().all()
+        
+        # Create label map for quick lookup
+        label_map = {label.id: label.name for label in project.labels}
 
         # Create output ZIP
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -303,9 +307,8 @@ class ExportService:
                     obj = SubElement(annotation, 'object')
                     
                     name = SubElement(obj, 'name')
-                    # Get label name from relationship
-                    await db.refresh(bbox, ['label'])
-                    name.text = bbox.label.name if bbox.label else 'unknown'
+                    # Use label map to get label name
+                    name.text = label_map.get(bbox.label_id, 'unknown')
                     
                     bndbox = SubElement(obj, 'bndbox')
                     xmin = SubElement(bndbox, 'xmin')
