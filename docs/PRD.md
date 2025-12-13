@@ -59,7 +59,7 @@
 | M-02 | 作为管理员，我想导入数据集 | **优先**：服务器路径索引/对象存储引用；**可选**：ZIP上传(v1.1) | P0 |
 | M-03 | 作为管理员，我想导入预标注数据 | Parser Template 系统：任意 JSON/JSONL + 声明式映射；内置 COCO/YOLO/VOC 模板 | P0 |
 | M-04 | 作为管理员，我想查看项目进度和统计 | Dashboard：完成率、日吞吐、人均效率 | P0 |
-| M-05 | 作为管理员，我想导出标注结果 | 支持 COCO/YOLO/VOC 格式；增量导出 | P0 |
+| M-05 | 作为管理员，我想导出标注结果 | 分类任务：CSV/JSON/ImageNet；检测/分割：COCO/YOLO/VOC；可选包含图片 | P0 |
 | M-06 | 作为管理员，我想配置项目的标签模板 | 预设类别+颜色+快捷键映射 | P1 |
 | M-07 | 作为管理员，我想查看标注员效率统计 | 人均耗时、采纳率、返工率 | P1 |
 
@@ -991,8 +991,8 @@ GET    /api/v1/projects/{id}/stats/daily   # 每日统计
 GET    /api/v1/projects/{id}/stats/annotators  # 标注员统计
 
 # 导出
-POST   /api/v1/projects/{id}/export        # 触发导出 (异步)
-GET    /api/v1/exports/{id}                # 下载导出文件
+POST   /api/v1/datasets/{id}/export        # 导出标注数据（ZIP下载）
+  # Query params: format=(coco|yolo|voc|csv|json|imagenet), include_images=bool
 ```
 
 ---

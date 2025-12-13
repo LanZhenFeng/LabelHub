@@ -16,6 +16,10 @@ pydantic-settings>=2.1.0,<3.0.0
 # Image Processing
 pillow>=10.2.0,<11.0.0
 
+# Parser Template & Data Import
+jmespath>=1.0.1,<2.0.0
+ijson>=3.2.3,<4.0.0
+
 # Utilities
 python-dateutil>=2.8.0,<3.0.0
 

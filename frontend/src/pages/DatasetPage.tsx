@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import {
   ArrowLeft,
   Grid3X3,
@@ -11,11 +12,30 @@ import {
   CheckCircle2,
   Clock,
   Ban,
+  Upload,
+  Download,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Progress } from '@/components/ui/progress'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { datasetsApi, itemsApi, projectsApi, type Item } from '@/lib/api'
@@ -40,6 +60,12 @@ export default function DatasetPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [page, setPage] = useState(1)
+  const parentRef = useRef<HTMLDivElement>(null)
+  
+  // Export dialog state
+  const [exportDialogOpen, setExportDialogOpen] = useState(false)
+  const [exportFormat, setExportFormat] = useState<'coco' | 'yolo' | 'voc' | 'csv' | 'json' | 'imagenet'>('csv')
+  const [includeImages, setIncludeImages] = useState(false)
 
   const { data: project } = useQuery({
     queryKey: ['project', projectId],
@@ -53,15 +79,48 @@ export default function DatasetPage() {
     enabled: !!datasetId,
   })
 
+  // 每页100张图片，支持虚拟滚动优化
   const { data: itemsData, isLoading: itemsLoading } = useQuery({
     queryKey: ['items', datasetId, statusFilter, page],
     queryFn: () =>
       itemsApi.list(Number(datasetId), {
         status: statusFilter === 'all' ? undefined : statusFilter,
         page,
-        page_size: 50,
+        page_size: 100,
       }),
     enabled: !!datasetId,
+  })
+
+  const items = itemsData?.items || []
+  
+  // 虚拟列表配置 - 按行虚拟化
+  // 根据视图模式确定列数（使用固定列数避免响应式问题）
+  const getColumnCount = () => {
+    if (viewMode === 'list') return 1
+    // Grid模式：使用固定6列，简化高度计算
+    return 6
+  }
+  
+  const columnCount = getColumnCount()
+  const rowCount = Math.ceil(items.length / columnCount)
+
+  // 动态计算行高：宁可高估也不重叠
+  const getRowHeight = () => {
+    if (viewMode === 'list') {
+      return 88 // list模式：固定高度
+    }
+    // Grid模式：图片是aspect-square，按容器宽度计算
+    // 假设容器宽度约1200px，6列，gap-4(16px)
+    // 每列宽度 ≈ (1200 - 5*16) / 6 ≈ 186px
+    // 加上gap约202px，为安全起见用250px
+    return 250
+  }
+
+  const rowVirtualizer = useVirtualizer({
+    count: rowCount,
+    getScrollElement: () => parentRef.current,
+    estimateSize: getRowHeight,
+    overscan: 2,
   })
 
   const scanMutation = useMutation({
@@ -84,6 +143,35 @@ export default function DatasetPage() {
   const handleStartAnnotation = () => {
     navigate(`/projects/${projectId}/datasets/${datasetId}/annotate`)
   }
+  
+  // Update export format when project changes
+  const handleOpenExportDialog = () => {
+    // Set default format based on task type when opening dialog
+    if (project) {
+      const defaultFormat = project.task_type === 'classification' ? 'csv' : 'coco'
+      setExportFormat(defaultFormat as any)
+    }
+    setExportDialogOpen(true)
+  }
+
+  // Export mutation
+  const exportMutation = useMutation({
+    mutationFn: () => datasetsApi.export(Number(datasetId), exportFormat, includeImages),
+    onSuccess: () => {
+      toast({
+        title: '导出成功',
+        description: `已生成 ${exportFormat.toUpperCase()} 格式导出文件`,
+      })
+      setExportDialogOpen(false)
+    },
+    onError: (error: Error) => {
+      toast({
+        title: '导出失败',
+        description: error.message,
+        variant: 'destructive',
+      })
+    },
+  })
 
   return (
     <div className="flex flex-col h-full">
@@ -109,6 +197,21 @@ export default function DatasetPage() {
           >
             <RefreshCw className={cn('w-4 h-4 mr-2', scanMutation.isPending && 'animate-spin')} />
             Rescan
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => navigate(`/projects/${projectId}/datasets/${datasetId}/import`)}
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            Import
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleOpenExportDialog}
+            disabled={!dataset || dataset.done_count === 0}
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Export
           </Button>
           <Button onClick={handleStartAnnotation} disabled={!dataset || dataset.todo_count === 0}>
             <Play className="w-4 h-4 mr-2" />
@@ -182,69 +285,118 @@ export default function DatasetPage() {
         </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-auto p-6">
-        {itemsLoading ? (
-          <div className={cn('grid gap-4', viewMode === 'grid' ? 'grid-cols-6' : 'grid-cols-1')}>
-            {Array.from({ length: 12 }).map((_, i) => (
-              <Skeleton key={i} className={viewMode === 'grid' ? 'aspect-square' : 'h-16'} />
-            ))}
-          </div>
-        ) : itemsData?.items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-center">
-            <ImageIcon className="w-16 h-16 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">No images found</h3>
-            <p className="text-muted-foreground mb-4">
-              {statusFilter === 'all'
-                ? 'Scan the dataset to import images'
-                : `No ${statusFilter} images in this dataset`}
-            </p>
-            {statusFilter === 'all' && (
-              <Button onClick={() => scanMutation.mutate()}>
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Scan Now
-              </Button>
-            )}
-          </div>
-        ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {itemsData?.items.map((item) => (
-              <ImageCard key={item.id} item={item} />
-            ))}
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {itemsData?.items.map((item) => (
-              <ImageRow key={item.id} item={item} />
-            ))}
-          </div>
-        )}
+      {/* Content - 分离滚动区域和分页 */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <div ref={parentRef} className="flex-1 overflow-auto p-6">
+          {itemsLoading ? (
+            <div className={cn('grid gap-4', viewMode === 'grid' ? 'grid-cols-6' : 'grid-cols-1')}>
+              {Array.from({ length: 12 }).map((_, i) => (
+                <Skeleton key={i} className={viewMode === 'grid' ? 'aspect-square' : 'h-16'} />
+              ))}
+            </div>
+          ) : items.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-64 text-center">
+              <ImageIcon className="w-16 h-16 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium mb-2">No images found</h3>
+              <p className="text-muted-foreground mb-4">
+                {statusFilter === 'all'
+                  ? 'Scan the dataset to import images'
+                  : `No ${statusFilter} images in this dataset`}
+              </p>
+              {statusFilter === 'all' && (
+                <Button onClick={() => scanMutation.mutate()}>
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Scan Now
+                </Button>
+              )}
+            </div>
+          ) : (
+            // 虚拟列表渲染
+            <div
+              style={{
+                height: `${rowVirtualizer.getTotalSize()}px`,
+                width: '100%',
+                position: 'relative',
+              }}
+            >
+              {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                const startIndex = virtualRow.index * columnCount
+                const rowItems = items.slice(startIndex, startIndex + columnCount)
 
-        {/* Pagination */}
+                return (
+                  <div
+                    key={virtualRow.key}
+                    data-index={virtualRow.index}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      transform: `translateY(${virtualRow.start}px)`,
+                      paddingBottom: viewMode === 'grid' ? '16px' : '8px', // 添加底部间距避免重叠
+                    }}
+                  >
+                    {viewMode === 'grid' ? (
+                      <div className="grid grid-cols-6 gap-4">
+                        {rowItems.map((item) => (
+                          <ImageCard key={item.id} item={item} />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {rowItems.map((item) => (
+                          <ImageRow key={item.id} item={item} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Pagination - 固定在底部，不在滚动区域内 */}
         {itemsData && itemsData.total_pages > 1 && (
-          <div className="flex items-center justify-center gap-2 mt-6">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-            >
-              Previous
-            </Button>
-            <span className="text-sm text-muted-foreground">
-              Page {page} of {itemsData.total_pages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((p) => Math.min(itemsData.total_pages, p + 1))}
-              disabled={page === itemsData.total_pages}
-            >
-              Next
-            </Button>
+          <div className="border-t bg-card px-6 py-3">
+            <div className="flex items-center justify-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+              >
+                Previous
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Page {page} of {itemsData.total_pages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.min(itemsData.total_pages, p + 1))}
+                disabled={page === itemsData.total_pages}
+              >
+                Next
+              </Button>
+            </div>
           </div>
         )}
       </div>
+      
+      {/* Export Dialog */}
+      <ExportDialog
+        open={exportDialogOpen}
+        onOpenChange={setExportDialogOpen}
+        format={exportFormat}
+        onFormatChange={setExportFormat}
+        includeImages={includeImages}
+        onIncludeImagesChange={setIncludeImages}
+        onExport={() => exportMutation.mutate()}
+        isExporting={exportMutation.isPending}
+        doneCount={dataset?.done_count ?? 0}
+        taskType={project?.task_type ?? 'detection'}
+      />
     </div>
   )
 }
@@ -326,3 +478,113 @@ function ImageRow({ item }: { item: Item }) {
   )
 }
 
+function ExportDialog({
+  open,
+  onOpenChange,
+  format,
+  onFormatChange,
+  includeImages,
+  onIncludeImagesChange,
+  onExport,
+  isExporting,
+  doneCount,
+  taskType,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  format: 'coco' | 'yolo' | 'voc' | 'csv' | 'json' | 'imagenet'
+  onFormatChange: (format: 'coco' | 'yolo' | 'voc' | 'csv' | 'json' | 'imagenet') => void
+  includeImages: boolean
+  onIncludeImagesChange: (checked: boolean) => void
+  onExport: () => void
+  isExporting: boolean
+  doneCount: number
+  taskType: string
+}) {
+  // Determine available formats based on task type
+  const formatOptions = taskType === 'classification' 
+    ? [
+        { value: 'csv', label: 'CSV', desc: '简单的文件名-标签对' },
+        { value: 'json', label: 'JSON', desc: '结构化JSON格式' },
+        { value: 'imagenet', label: 'ImageNet', desc: '按类别文件夹组织' },
+      ]
+    : [
+        { value: 'coco', label: 'COCO JSON', desc: 'MS COCO JSON 格式，包含完整标注信息' },
+        { value: 'yolo', label: 'YOLO TXT', desc: 'YOLO 格式，归一化坐标 + classes.txt' },
+        { value: 'voc', label: 'Pascal VOC XML', desc: 'Pascal VOC XML 格式，标准边界框结构' },
+      ]
+  
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>导出标注数据</DialogTitle>
+          <DialogDescription>
+            选择导出格式和选项。将导出 {doneCount} 张已完成标注的图片。
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="format">导出格式</Label>
+            <Select value={format} onValueChange={(v) => onFormatChange(v as any)}>
+              <SelectTrigger id="format">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {formatOptions.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {formatOptions.find((opt) => opt.value === format)?.desc}
+            </p>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="include-images"
+              checked={includeImages}
+              onCheckedChange={onIncludeImagesChange}
+            />
+            <label
+              htmlFor="include-images"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              包含图片文件
+            </label>
+          </div>
+          <p className="text-xs text-muted-foreground pl-6">
+            {includeImages
+              ? format === 'imagenet'
+                ? '图片将按类别文件夹组织'
+                : '将图片和标注一起打包下载（文件较大）'
+              : '仅下载标注文件'}
+          </p>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isExporting}>
+            取消
+          </Button>
+          <Button onClick={onExport} disabled={isExporting || doneCount === 0}>
+            {isExporting ? (
+              <>
+                <div className="h-4 w-4 mr-2 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                导出中...
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4 mr-2" />
+                导出
+              </>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}

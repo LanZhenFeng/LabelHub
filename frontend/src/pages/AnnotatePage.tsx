@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -39,6 +39,7 @@ import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { itemsApi, projectsApi, type Label as LabelType } from '@/lib/api'
 import { ImageViewer } from '@/components/ImageViewer'
+import { useImagePrefetch } from '@/hooks/use-image-prefetch'
 
 export default function AnnotatePage() {
   const { projectId, datasetId } = useParams<{ projectId: string; datasetId: string }>()
@@ -70,6 +71,28 @@ export default function AnnotatePage() {
 
   const item = nextItemData?.item
   const labels = project?.labels || []
+
+  // 获取后续待标注项目用于预取
+  const { data: upcomingItems } = useQuery({
+    queryKey: ['upcomingItems', datasetId],
+    queryFn: () => itemsApi.list(Number(datasetId), { status: 'todo', page: 1, page_size: 5 }),
+    enabled: !!datasetId,
+  })
+
+  // 计算后续图片 URL（排除当前图片）
+  const upcomingImageUrls = useMemo(() => {
+    if (!upcomingItems?.items || !item) return []
+    return upcomingItems.items
+      .filter((upcomingItem) => upcomingItem.id !== item.id)
+      .map((upcomingItem) => upcomingItem.image_url)
+      .slice(0, 3) // 只取前3张
+  }, [upcomingItems, item])
+
+  // 启用图片预取
+  useImagePrefetch(item?.image_url, upcomingImageUrls, {
+    prefetchCount: 3,
+    bandwidthAware: true,
+  })
 
   // Classification mutation
   const classifyMutation = useMutation({
@@ -308,8 +331,14 @@ export default function AnnotatePage() {
       <div className="flex-1 flex overflow-hidden">
         {/* Image area */}
         {nextItemLoading ? (
-          <div className="flex-1 flex items-center justify-center bg-black/5">
-            <Skeleton className="w-full max-w-3xl aspect-video" />
+          <div className="flex-1 flex items-center justify-center bg-muted/30">
+            <div className="flex flex-col items-center gap-4">
+              <Skeleton className="w-full max-w-3xl aspect-video rounded-lg" />
+              <div className="flex gap-2">
+                <Skeleton className="h-3 w-32" />
+                <Skeleton className="h-3 w-24" />
+              </div>
+            </div>
           </div>
         ) : item ? (
           <ImageViewer imageUrl={item.image_url} className="flex-1 flex flex-col" />

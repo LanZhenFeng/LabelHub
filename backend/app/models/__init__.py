@@ -10,6 +10,7 @@ from app.models.dataset import Dataset
 from app.models.item import Item
 from app.models.label import Label
 from app.models.project import Project
+from app.models.parser_template import ParserTemplate
 
 __all__ = [
     "Project",
@@ -20,5 +21,6 @@ __all__ = [
     "BBoxAnnotation",
     "PolygonAnnotation",
     "AnnotationEvent",
+    "ParserTemplate",
 ]
 
