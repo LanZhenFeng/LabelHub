@@ -1,5 +1,6 @@
 """Data export service for annotations."""
 
+import csv
 import json
 import zipfile
 from datetime import datetime
@@ -20,6 +21,131 @@ from app.models.project import Project
 
 class ExportService:
     """Service for exporting annotations in various formats."""
+
+    async def export_classification(
+        self,
+        db: AsyncSession,
+        dataset_id: int,
+        output_path: Path,
+        format: str = "csv",  # csv, json, imagenet
+        include_images: bool = False,
+        status_filter: Optional[List[ItemStatus]] = None,
+    ) -> Path:
+        """
+        Export classification annotations.
+        
+        Args:
+            db: Database session
+            dataset_id: Dataset ID to export
+            output_path: Output directory path
+            format: Export format (csv, json, imagenet)
+            include_images: Whether to include image files in ZIP
+            status_filter: Filter items by status (default: done)
+            
+        Returns:
+            Path to generated ZIP file
+        """
+        # Default to only export 'done' items
+        if status_filter is None:
+            status_filter = [ItemStatus.DONE]
+
+        # Fetch dataset with project
+        query = (
+            select(Dataset)
+            .options(selectinload(Dataset.project))
+            .where(Dataset.id == dataset_id)
+        )
+        result = await db.execute(query)
+        dataset = result.scalar_one()
+        project = dataset.project
+
+        # Fetch items with classifications
+        items_query = (
+            select(Item)
+            .options(selectinload(Item.classifications))
+            .where(Item.dataset_id == dataset_id)
+            .where(Item.status.in_(status_filter))
+        )
+        result = await db.execute(items_query)
+        items = result.scalars().all()
+
+        # Create output ZIP
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        zip_path = output_path / f"{dataset.name}_classification_{timestamp}.zip"
+        
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            if format == "csv":
+                # CSV format: filename, label
+                lines = ["filename,label\n"]
+                for item in items:
+                    if item.classifications:
+                        label = item.classifications[0].label
+                        lines.append(f"{item.filename},{label}\n")
+                zipf.writestr("annotations.csv", "".join(lines))
+            
+            elif format == "json":
+                # JSON format
+                annotations = []
+                for item in items:
+                    if item.classifications:
+                        annotations.append({
+                            "filename": item.filename,
+                            "label": item.classifications[0].label,
+                            "rel_path": item.rel_path,
+                        })
+                zipf.writestr(
+                    "annotations.json",
+                    json.dumps({
+                        "dataset": dataset.name,
+                        "project": project.name,
+                        "task_type": "classification",
+                        "created_at": datetime.now().isoformat(),
+                        "annotations": annotations,
+                    }, indent=2, ensure_ascii=False)
+                )
+            
+            elif format == "imagenet":
+                # ImageNet format: organize by class folders
+                # Also create a mapping file
+                class_folders = {}
+                for item in items:
+                    if item.classifications:
+                        label = item.classifications[0].label
+                        if label not in class_folders:
+                            class_folders[label] = []
+                        class_folders[label].append(item)
+                
+                # Write class mapping
+                class_names = list(class_folders.keys())
+                zipf.writestr("classes.txt", "\n".join(class_names))
+                
+                # If including images, organize them by class
+                if include_images:
+                    for class_name, class_items in class_folders.items():
+                        for item in class_items:
+                            full_path = Path(dataset.root_path) / item.rel_path
+                            if full_path.exists():
+                                zipf.write(full_path, f"images/{class_name}/{item.filename}")
+                else:
+                    # Just write file lists per class
+                    for class_name, class_items in class_folders.items():
+                        filenames = [item.filename for item in class_items]
+                        zipf.writestr(
+                            f"{class_name}_files.txt",
+                            "\n".join(filenames)
+                        )
+            
+            # Optionally include images (if not ImageNet format with images)
+            if include_images and format != "imagenet":
+                for item in items:
+                    if item.classifications:
+                        full_path = Path(dataset.root_path) / item.rel_path
+                        if full_path.exists():
+                            # Organize by label
+                            label = item.classifications[0].label
+                            zipf.write(full_path, f"images/{label}/{item.filename}")
+
+        return zip_path
 
     async def export_coco(
         self,

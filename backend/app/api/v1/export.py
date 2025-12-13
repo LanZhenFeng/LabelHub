@@ -11,7 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.models.item import ItemStatus
+from app.models.project import Project
 from app.services.export import ExportService
+from sqlalchemy import select
 
 router = APIRouter()
 settings = get_settings()
@@ -27,7 +29,7 @@ class ExportRequest(BaseModel):
 @router.post("/datasets/{dataset_id}/export")
 async def export_dataset(
     dataset_id: int,
-    format: str = Query(..., regex="^(coco|yolo|voc)$"),
+    format: str = Query(..., regex="^(coco|yolo|voc|csv|json|imagenet)$"),
     include_images: bool = Query(False),
     status: Optional[List[str]] = Query(None),
     db: AsyncSession = Depends(get_db),
@@ -37,7 +39,9 @@ async def export_dataset(
     
     Args:
         dataset_id: Dataset ID
-        format: Export format (coco, yolo, voc)
+        format: Export format
+            - Detection/Segmentation: coco, yolo, voc
+            - Classification: csv, json, imagenet
         include_images: Include image files in export
         status: Filter by status (default: done only)
     
@@ -58,19 +62,60 @@ async def export_dataset(
     export_dir = Path(tempfile.gettempdir()) / "labelhub_exports"
     export_dir.mkdir(parents=True, exist_ok=True)
     
+    # Get project to determine task type
+    from app.models.dataset import Dataset
+    query = select(Dataset).where(Dataset.id == dataset_id)
+    result = await db.execute(query)
+    dataset = result.scalar_one_or_none()
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    
+    # Get project
+    query = select(Project).where(Project.id == dataset.project_id)
+    result = await db.execute(query)
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
     # Export based on format
     export_service = ExportService()
     
     try:
-        if format == "coco":
+        # Classification formats
+        if format in ["csv", "json", "imagenet"]:
+            if project.task_type != "classification":
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Format '{format}' is only for classification tasks"
+                )
+            zip_path = await export_service.export_classification(
+                db, dataset_id, export_dir, format, include_images, status_filter
+            )
+        # Detection/Segmentation formats
+        elif format == "coco":
+            if project.task_type == "classification":
+                raise HTTPException(
+                    status_code=400,
+                    detail="COCO format is not for classification tasks. Use csv, json, or imagenet."
+                )
             zip_path = await export_service.export_coco(
                 db, dataset_id, export_dir, include_images, status_filter
             )
         elif format == "yolo":
+            if project.task_type == "classification":
+                raise HTTPException(
+                    status_code=400,
+                    detail="YOLO format is not for classification tasks. Use csv, json, or imagenet."
+                )
             zip_path = await export_service.export_yolo(
                 db, dataset_id, export_dir, include_images, status_filter
             )
         elif format == "voc":
+            if project.task_type == "classification":
+                raise HTTPException(
+                    status_code=400,
+                    detail="VOC format is not for classification tasks. Use csv, json, or imagenet."
+                )
             zip_path = await export_service.export_voc(
                 db, dataset_id, export_dir, include_images, status_filter
             )
@@ -89,4 +134,5 @@ async def export_dataset(
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
+
 

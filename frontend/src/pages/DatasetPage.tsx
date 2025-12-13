@@ -64,7 +64,7 @@ export default function DatasetPage() {
   
   // Export dialog state
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
-  const [exportFormat, setExportFormat] = useState<'coco' | 'yolo' | 'voc'>('coco')
+  const [exportFormat, setExportFormat] = useState<'coco' | 'yolo' | 'voc' | 'csv' | 'json' | 'imagenet'>('coco')
   const [includeImages, setIncludeImages] = useState(false)
 
   const { data: project } = useQuery({
@@ -385,6 +385,7 @@ export default function DatasetPage() {
         onExport={() => exportMutation.mutate()}
         isExporting={exportMutation.isPending}
         doneCount={dataset?.done_count ?? 0}
+        taskType={project?.task_type ?? 'detection'}
       />
     </div>
   )
@@ -477,17 +478,32 @@ function ExportDialog({
   onExport,
   isExporting,
   doneCount,
+  taskType,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  format: 'coco' | 'yolo' | 'voc'
-  onFormatChange: (format: 'coco' | 'yolo' | 'voc') => void
+  format: 'coco' | 'yolo' | 'voc' | 'csv' | 'json' | 'imagenet'
+  onFormatChange: (format: 'coco' | 'yolo' | 'voc' | 'csv' | 'json' | 'imagenet') => void
   includeImages: boolean
   onIncludeImagesChange: (checked: boolean) => void
   onExport: () => void
   isExporting: boolean
   doneCount: number
+  taskType: string
 }) {
+  // Determine available formats based on task type
+  const formatOptions = taskType === 'classification' 
+    ? [
+        { value: 'csv', label: 'CSV', desc: '简单的文件名-标签对' },
+        { value: 'json', label: 'JSON', desc: '结构化JSON格式' },
+        { value: 'imagenet', label: 'ImageNet', desc: '按类别文件夹组织' },
+      ]
+    : [
+        { value: 'coco', label: 'COCO JSON', desc: 'MS COCO JSON 格式，包含完整标注信息' },
+        { value: 'yolo', label: 'YOLO TXT', desc: 'YOLO 格式，归一化坐标 + classes.txt' },
+        { value: 'voc', label: 'Pascal VOC XML', desc: 'Pascal VOC XML 格式，标准边界框结构' },
+      ]
+  
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -506,15 +522,15 @@ function ExportDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="coco">COCO JSON</SelectItem>
-                <SelectItem value="yolo">YOLO TXT</SelectItem>
-                <SelectItem value="voc">Pascal VOC XML</SelectItem>
+                {formatOptions.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              {format === 'coco' && 'MS COCO JSON 格式，包含完整标注信息'}
-              {format === 'yolo' && 'YOLO 格式，归一化坐标 + classes.txt'}
-              {format === 'voc' && 'Pascal VOC XML 格式，标准边界框结构'}
+              {formatOptions.find((opt) => opt.value === format)?.desc}
             </p>
           </div>
 
@@ -533,7 +549,9 @@ function ExportDialog({
           </div>
           <p className="text-xs text-muted-foreground pl-6">
             {includeImages
-              ? '将图片和标注一起打包下载（文件较大）'
+              ? format === 'imagenet'
+                ? '图片将按类别文件夹组织'
+                : '将图片和标注一起打包下载（文件较大）'
               : '仅下载标注文件'}
           </p>
         </div>
