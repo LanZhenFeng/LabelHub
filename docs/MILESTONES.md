@@ -1,7 +1,7 @@
 # LabelHub 里程碑交付计划
 
 > 版本：v1.0-MVP (修订版)  
-> 最后更新：2025-12-13  
+> 最后更新：2025-12-14  
 > 预计总工期：8-10 周  
 > 变更：预标注改为 Parser Template 系统；明确缓存口径；统计以事件日志为数据源
 
@@ -10,76 +10,89 @@
 ## 概览
 
 ```
-时间线：
-Week 0-2    ████████░░░░░░░░░░░░░░░░░░  M0: 基础框架
-Week 2-4    ░░░░░░░░████████░░░░░░░░░░  M1: 核心标注功能
+进度：
+Week 0-2    ████████████████████████████  M0: 基础框架 ✅ DONE
+Week 2-4    ░░░░░░░░████████░░░░░░░░░░░░  M1: 核心标注功能
 Week 4-7    ░░░░░░░░░░░░░░░░████████████  M2: 效率优化
 Week 7-9    ░░░░░░░░░░░░░░░░░░░░░░░░████  M3: 统计与完善
 ```
 
 ---
 
-## M0: 基础框架搭建
+## M0: 基础框架搭建 ✅ 已完成
 
-**时间：Week 0 ~ Week 2 (2周)**
+**时间：Week 0 ~ Week 2 (2周)**  
+**状态：✅ 已完成** (2025-12-14)
 
 ### 🎯 目标
 建立项目基础架构，实现数据流闭环，能够完成最简单的分类标注。
 
 ### 📦 交付范围
 
-#### 后端 (FastAPI)
-- 项目脚手架 (目录结构、配置管理、日志)
-- 数据库模型 (Project, Dataset, Image, Annotation, EventLog)
-- 基础 CRUD API
-  - `POST/GET/PUT/DELETE /projects`
-  - `POST/GET /datasets`
-  - `GET /images` (分页)
-  - `POST/GET /annotations`
-- 数据集导入接口 (服务器路径索引)
-- 缩略图生成服务 (Pillow, 200x200, WebP)
-- 基础认证 (JWT)
-- ETag 生成与 304 响应支持
+#### 后端 (FastAPI) ✅
+- ✅ 项目脚手架 (目录结构、Pydantic Settings 配置管理、结构化日志)
+- ✅ 数据库模型 (Project, Dataset, Item, Label, ClassificationAnnotation, AnnotationEvent)
+  - *注：Image 改为 Item 以支持未来多媒体类型；EventLog 改为 AnnotationEvent 更具体*
+- ✅ 基础 CRUD API
+  - `POST/GET/PUT/DELETE /api/v1/projects`
+  - `POST/GET/PUT/DELETE /api/v1/datasets`
+  - `GET /api/v1/datasets/{id}/items` (分页)
+  - `POST /api/v1/annotations/classification`
+- ✅ 数据集导入接口 (`POST /api/v1/datasets/{id}/scan` 服务器路径索引)
+- ✅ 缩略图生成服务 (Pillow, 256x256, WebP)
+- ✅ Alembic 数据库迁移
+- ✅ pytest 单元测试 (12 tests)
+- ⏸️ 基础认证 (JWT) - *推迟至 M1/v1.1，M0 无多用户场景*
 
-#### 前端 (React)
-- 项目脚手架 (Vite + React + TypeScript)
-- 路由配置 (React Router)
-- 全局状态管理 (Zustand)
-- API 层封装 (Axios + TanStack Query)
-- UI 组件库集成 (**Tailwind + shadcn/ui**)
-- 基础布局 (Header, Sidebar, Content)
-- 项目列表页
-- 数据集页 (简单网格，非虚拟列表)
-- 最简标注页 (图片展示 + 分类选择)
+#### 前端 (React) ✅
+- ✅ 项目脚手架 (Vite + React 18 + TypeScript)
+- ✅ 路由配置 (React Router v6)
+- ✅ 服务端状态管理 (TanStack Query v5)
+  - *注：Zustand 包已安装但未使用，React Query 足以满足 M0 需求*
+- ✅ API 层封装 (Axios + 类型定义)
+- ✅ UI 组件库集成 (Tailwind CSS + shadcn/ui)
+- ✅ 基础布局 (Sidebar 导航 + 主内容区)
+- ✅ 项目列表页 (创建/编辑/删除项目，管理标签)
+- ✅ 数据集页 (缩略图网格/列表视图，状态筛选，扫描导入)
+- ✅ 分类标注页 (图片展示 + 键盘快捷键 1-9/Enter/Space/S/Ctrl+Delete)
 
-#### DevOps
-- Docker Compose 开发环境
-- Makefile 常用命令
-- README 快速启动指南
+#### DevOps ✅
+- ✅ Docker Compose 开发/生产环境
+- ✅ Makefile 常用命令 (dev/up/down/logs/test/lint/format)
+- ✅ README 快速启动指南 (三种启动方式)
+- ✅ GitHub Actions CI (lint + test + build)
 
 ### ✅ 验收标准
 
-| 验收项 | 标准 |
-|--------|------|
-| 项目创建 | 可创建项目，选择类型（分类） |
-| 数据导入 | 可上传图片文件夹，显示在数据集中 |
-| 基础标注 | 可查看图片，选择分类标签，提交 |
-| 进度显示 | 显示已标/待标数量 |
-| 部署运行 | `docker-compose up` 一键启动 |
+| 验收项 | 标准 | 状态 |
+|--------|------|------|
+| 项目创建 | 可创建项目，选择类型（分类） | ✅ |
+| 数据导入 | 可扫描服务器路径，显示在数据集中 | ✅ |
+| 基础标注 | 可查看图片，选择分类标签，提交 | ✅ |
+| 进度显示 | 显示已标/待标/跳过数量 | ✅ |
+| 部署运行 | `docker-compose up` 一键启动 | ✅ |
 
 ### ⚠️ 风险与缓解
 
-| 风险 | 影响 | 概率 | 缓解措施 |
-|------|------|------|----------|
-| 技术栈不熟悉 | 中 | 中 | 优先验证关键技术点；准备备选方案 |
-| 数据库设计返工 | 高 | 低 | 仔细评审 ER 图；预留扩展字段 |
-| 环境配置问题 | 低 | 中 | Docker 标准化；文档详细 |
+| 风险 | 影响 | 概率 | 结果 |
+|------|------|------|------|
+| 技术栈不熟悉 | 中 | 中 | ✅ 已验证，FastAPI + React Query 配合良好 |
+| 数据库设计返工 | 高 | 低 | ✅ 预留了扩展字段，Item 支持多状态 |
+| 环境配置问题 | 低 | 中 | ✅ Docker 标准化解决 |
 
 ### 📊 Definition of Done
-- [ ] 所有 API 端点可通过 Swagger UI 测试
-- [ ] 前端可完成完整的分类标注流程
-- [ ] 代码通过 Lint 检查
-- [ ] 核心功能有基础测试覆盖
+- [x] 所有 API 端点可通过 Swagger UI 测试 (`/docs`)
+- [x] 前端可完成完整的分类标注流程
+- [x] 代码通过 Lint 检查 (Ruff + ESLint)
+- [x] 核心功能有基础测试覆盖 (pytest 12 tests passed)
+
+### 📝 M0 实现说明
+
+**与计划的差异**：
+1. **JWT 认证推迟**：M0 无多用户场景，认证推迟至 M1
+2. **ETag/304 移至 M2**：这是慢网优化的内容，不属于基础框架
+3. **模型命名调整**：`Image` → `Item`（扩展性），`EventLog` → `AnnotationEvent`（更具体）
+4. **状态管理**：React Query 作为主要状态管理，Zustand 备用
 
 ---
 
@@ -557,11 +570,15 @@ const trackAnnotation = {
 
 | 功能 | M0 | M1 | M2 | M3 | v1.1 | v2 |
 |------|----|----|----|----|------|-----|
-| 分类标注 | ✓ | | | | | |
+| 分类标注 | ✅ | | | | | |
+| 项目/数据集 CRUD | ✅ | | | | | |
+| 服务器路径导入 | ✅ | | | | | |
+| 缩略图服务 | ✅ | | | | | |
+| 事件日志 (AnnotationEvent) | ✅ | | | | | |
 | 检测标注 (BBox) | | ✓ | | | | |
 | 分割标注 (Polygon) | | ✓ | | | | |
 | 分割标注 (Mask) | | | | | ✓ | |
-| 快捷键系统 | | ✓ | | | | |
+| 画布快捷键系统 | | ✓ | | | | |
 | Undo/Redo (Command) | | ✓ | | | | |
 | 虚拟列表 | | | ✓ | | | |
 | 图片预取 | | | ✓ | | | |
@@ -575,6 +592,7 @@ const trackAnnotation = {
 | 效率 Dashboard (EventLog) | | | | ✓ | | |
 | 深色模式 | | | | P1 | | |
 | 设置页面 | | | | ✓ | | |
+| **JWT 用户认证** | | | | | ✓ | |
 | Range/206 断点 | | | | | ✓ | |
 | 离线标注 | | | | | ✓ | |
 | JSONPath 兼容 | | | | | ✓ | |
@@ -610,24 +628,24 @@ const trackAnnotation = {
 
 ## 附录：检查清单
 
-### M0 Checklist
-- [ ] 后端项目初始化完成
-- [ ] 数据库 Schema 设计评审通过 (含 EventLog)
-- [ ] API 端点实现并测试
-- [ ] ETag 生成与 304 响应
-- [ ] 前端项目初始化完成 (Tailwind + shadcn/ui)
-- [ ] 基础页面布局完成
-- [ ] 分类标注流程可用
-- [ ] Docker 环境可用
+### M0 Checklist ✅ 已完成
+- [x] 后端项目初始化完成 (FastAPI + SQLAlchemy 2.0 async)
+- [x] 数据库 Schema 设计评审通过 (含 AnnotationEvent 事件日志)
+- [x] API 端点实现并测试 (Swagger UI + pytest 12 tests)
+- [x] 前端项目初始化完成 (Vite + React 18 + Tailwind + shadcn/ui)
+- [x] 基础页面布局完成 (Sidebar + 主内容区)
+- [x] 分类标注流程可用 (键盘快捷键支持)
+- [x] Docker 环境可用 (docker-compose.yml + docker-compose.dev.yml)
+- [x] CI 流水线可用 (GitHub Actions: lint + test + build)
 
 ### M1 Checklist
 - [ ] Fabric.js 画布集成
-- [ ] BBox 工具完整可用
-- [ ] Polygon 工具完整可用
-- [ ] 快捷键系统可用
-- [ ] Undo/Redo 系统可用 (Command Pattern)
-- [ ] 无内存泄漏
-- [ ] 状态机 (todo/in_progress/done/skipped/deleted)
+- [ ] BBox 工具完整可用 (绘制/移动/调整/删除)
+- [ ] Polygon 工具完整可用 (顶点添加/编辑/闭合)
+- [ ] 画布快捷键系统可用 (V/R/P/Delete/Ctrl+Z/Y)
+- [ ] Undo/Redo 系统可用 (Command Pattern, 50步)
+- [ ] 无内存泄漏 (Chrome DevTools 验证)
+- [x] 状态机 (todo/in_progress/done/skipped/deleted) - *M0 已实现*
 
 ### M2 Checklist
 - [ ] 虚拟列表实现
