@@ -128,11 +128,12 @@ def upgrade() -> None:
     # 5. 创建默认管理员用户
     # 密码: admin123 (bcrypt hash)
     # 生产环境请立即修改！
+    # 注意：使用 example.com 域名以通过 EmailStr 验证
     op.execute(
         text(
             """
             INSERT INTO users (username, email, hashed_password, role, is_active, created_at, updated_at)
-            VALUES ('admin', 'admin@labelhub.local', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyWUI3YTb30y', 'admin', 1, datetime('now'), datetime('now'))
+            VALUES ('admin', 'admin@example.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyWUI3YTb30y', 'admin', 1, datetime('now'), datetime('now'))
             """
         )
     )

@@ -25,11 +25,11 @@ router = APIRouter()
 @router.get("/datasets/{dataset_id}/items", response_model=ItemListResponse)
 async def list_items(
     dataset_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
     current_user: CurrentUser,  # M4: Require authentication
     status: ItemStatus | None = Query(None, description="Filter by status"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
-    db: Annotated[AsyncSession, Depends(get_db)] = Depends(get_db),
 ):
     """List items in a dataset with pagination."""
     # Verify dataset exists
@@ -75,8 +75,8 @@ async def list_items(
 @router.get("/datasets/{dataset_id}/next-item", response_model=NextItemResponse)
 async def get_next_item(
     dataset_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
     current_user: CurrentUser,  # M4: Require authentication
-    db: Annotated[AsyncSession, Depends(get_db)] = Depends(get_db),
 ):
     """Get the next item to annotate.
     
@@ -173,8 +173,8 @@ async def get_next_item(
 @router.get("/items/{item_id}", response_model=ItemResponse)
 async def get_item(
     item_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
     current_user: CurrentUser,  # M4: Require authentication
-    db: Annotated[AsyncSession, Depends(get_db)] = Depends(get_db),
 ):
     """Get a single item by ID."""
     query = (
@@ -194,8 +194,8 @@ async def get_item(
 @router.get("/items/{item_id}/previous", response_model=ItemResponse | None)
 async def get_previous_item(
     item_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
     current_user: CurrentUser,  # M4: Require authentication
-    db: Annotated[AsyncSession, Depends(get_db)] = Depends(get_db),
 ):
     """Get the previous item in the dataset (by ID order)."""
     # Get current item to know dataset
@@ -232,8 +232,8 @@ async def get_previous_item(
 @router.get("/items/{item_id}/next", response_model=ItemResponse | None)
 async def get_next_item_by_order(
     item_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
     current_user: CurrentUser,  # M4: Require authentication
-    db: Annotated[AsyncSession, Depends(get_db)] = Depends(get_db),
 ):
     """Get the next item in the dataset (by ID order, regardless of status)."""
     # Get current item to know dataset
@@ -271,9 +271,9 @@ async def get_next_item_by_order(
 async def get_thumbnail(
     item_id: int,
     request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)],
     current_user: CurrentUser,  # M4: Require authentication
     size: int = Query(256, ge=64, le=512),
-    db: Annotated[AsyncSession, Depends(get_db)] = Depends(get_db),
 ):
     """Get thumbnail for an item with HTTP caching support."""
     # Get item with dataset
@@ -318,9 +318,9 @@ async def get_thumbnail(
 async def get_image(
     item_id: int,
     request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)],
     current_user: CurrentUser,  # M4: Require authentication
     variant: str = Query("orig", regex="^(orig|medium)$"),
-    db: Annotated[AsyncSession, Depends(get_db)] = Depends(get_db),
 ):
     """Get original or medium image for an item with HTTP caching support."""
     # Get item with dataset
