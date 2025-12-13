@@ -38,6 +38,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { itemsApi, projectsApi, type Label as LabelType } from '@/lib/api'
+import { ImageViewer } from '@/components/ImageViewer'
 
 export default function AnnotatePage() {
   const { projectId, datasetId } = useParams<{ projectId: string; datasetId: string }>()
@@ -48,8 +49,6 @@ export default function AnnotatePage() {
   const [skipDialogOpen, setSkipDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [skipReason, setSkipReason] = useState('')
-  const [imageLoaded, setImageLoaded] = useState(false)
-  const [imageZoom, setImageZoom] = useState(1)
 
   // Fetch project for labels
   const { data: project } = useQuery({
@@ -79,7 +78,6 @@ export default function AnnotatePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['items', datasetId] })
       setSelectedLabel(null)
-      setImageLoaded(false)
       refetchNextItem()
     },
     onError: () => {
@@ -95,7 +93,6 @@ export default function AnnotatePage() {
       queryClient.invalidateQueries({ queryKey: ['items', datasetId] })
       setSkipDialogOpen(false)
       setSkipReason('')
-      setImageLoaded(false)
       refetchNextItem()
       toast({ title: 'Skipped', description: 'Item has been skipped' })
     },
@@ -107,7 +104,6 @@ export default function AnnotatePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['items', datasetId] })
       setDeleteDialogOpen(false)
-      setImageLoaded(false)
       refetchNextItem()
       toast({ title: 'Deleted', description: 'Item has been deleted' })
     },
@@ -129,8 +125,6 @@ export default function AnnotatePage() {
         item: prevItem,
       }))
       setSelectedLabel(null)
-      setImageLoaded(false)
-      setImageZoom(1)
     } catch {
       toast({ title: 'No previous item', description: 'This is the first item' })
     }
@@ -162,8 +156,6 @@ export default function AnnotatePage() {
         item: nextItem,
       }))
       setSelectedLabel(null)
-      setImageLoaded(false)
-      setImageZoom(1)
     } catch {
       toast({ title: 'Error', description: 'Failed to load next item', variant: 'destructive' })
     }
@@ -236,19 +228,6 @@ export default function AnnotatePage() {
         case 'ArrowRight':
           e.preventDefault()
           goToNextItem()
-          break
-        case '+':
-        case '=':
-          e.preventDefault()
-          setImageZoom(z => Math.min(z * 1.2, 5))
-          break
-        case '-':
-          e.preventDefault()
-          setImageZoom(z => Math.max(z / 1.2, 0.5))
-          break
-        case '0':
-          e.preventDefault()
-          setImageZoom(1)
           break
       }
     }
@@ -328,48 +307,13 @@ export default function AnnotatePage() {
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Image area */}
-        <div 
-          className="flex-1 flex items-center justify-center p-8 bg-black/5 overflow-auto"
-          onWheel={(e) => {
-            if (e.ctrlKey || e.metaKey) {
-              // Only zoom when Ctrl/Cmd is held (like detection/segmentation)
-              e.preventDefault()
-              const delta = e.deltaY
-              setImageZoom(z => {
-                const newZoom = z * (delta > 0 ? 0.9 : 1.1)
-                return Math.min(Math.max(newZoom, 0.5), 5)
-              })
-            }
-          }}
-        >
-          {nextItemLoading ? (
+        {nextItemLoading ? (
+          <div className="flex-1 flex items-center justify-center bg-black/5">
             <Skeleton className="w-full max-w-3xl aspect-video" />
-          ) : item ? (
-            <div className="relative flex items-center justify-center">
-              {!imageLoaded && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-                </div>
-              )}
-              <img
-                key={item.id}
-                src={item.image_url}
-                alt={item.filename}
-                style={{ transform: `scale(${imageZoom})` }}
-                className={cn(
-                  'max-w-full max-h-[calc(100vh-200px)] object-contain rounded-lg shadow-lg transition-all',
-                  imageLoaded ? 'opacity-100' : 'opacity-0'
-                )}
-                onLoad={() => setImageLoaded(true)}
-              />
-              {imageZoom !== 1 && (
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 text-white px-3 py-1 rounded-full text-sm">
-                  {Math.round(imageZoom * 100)}%
-                </div>
-              )}
-            </div>
-          ) : null}
-        </div>
+          </div>
+        ) : item ? (
+          <ImageViewer imageUrl={item.image_url} className="flex-1 flex flex-col" />
+        ) : null}
 
         {/* Sidebar */}
         <aside className="w-80 bg-card border-l flex flex-col">
