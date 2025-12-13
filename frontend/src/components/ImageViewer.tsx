@@ -143,7 +143,6 @@ export function ImageViewer({ imageUrl, className }: ImageViewerProps) {
 
   // Mouse wheel zoom
   const handleWheel = useCallback((e: WheelEvent) => {
-    if (!e.ctrlKey && !e.metaKey) return
     e.preventDefault()
     
     const canvas = canvasRef.current
