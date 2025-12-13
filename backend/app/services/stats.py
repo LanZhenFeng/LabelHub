@@ -15,6 +15,7 @@ from app.models.annotation import (
     ClassificationAnnotation,
     PolygonAnnotation,
 )
+from app.models.dataset import Dataset
 from app.models.item import Item, ItemStatus
 from app.models.label import Label
 from app.schemas.stats import AnnotatorStats, DailyStats, OverviewStats
@@ -33,9 +34,17 @@ class StatsService:
         Calculate overview statistics for a project or dataset
         """
         # Build base query for items
-        query = select(Item).where(Item.project_id == project_id)
+        # Item has dataset_id, need to join Dataset to filter by project_id
         if dataset_id:
-            query = query.where(Item.dataset_id == dataset_id)
+            # Filter by specific dataset
+            query = select(Item).where(Item.dataset_id == dataset_id)
+        else:
+            # Filter by project (join through Dataset)
+            query = (
+                select(Item)
+                .join(Dataset, Item.dataset_id == Dataset.id)
+                .where(Dataset.project_id == project_id)
+            )
 
         result = await db.execute(query)
         items = result.scalars().all()
