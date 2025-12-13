@@ -331,8 +331,14 @@ export default function AnnotatePage() {
       <div className="flex-1 flex overflow-hidden">
         {/* Image area */}
         {nextItemLoading ? (
-          <div className="flex-1 flex items-center justify-center bg-black/5">
-            <Skeleton className="w-full max-w-3xl aspect-video" />
+          <div className="flex-1 flex items-center justify-center bg-muted/30">
+            <div className="flex flex-col items-center gap-4">
+              <Skeleton className="w-full max-w-3xl aspect-video rounded-lg" />
+              <div className="flex gap-2">
+                <Skeleton className="h-3 w-32" />
+                <Skeleton className="h-3 w-24" />
+              </div>
+            </div>
           </div>
         ) : item ? (
           <ImageViewer imageUrl={item.image_url} className="flex-1 flex flex-col" />

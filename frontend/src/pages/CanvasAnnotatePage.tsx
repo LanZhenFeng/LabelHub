@@ -488,8 +488,18 @@ export default function CanvasAnnotatePage() {
       {/* Main content */}
       <div className="flex-1 overflow-hidden">
         {nextItemLoading ? (
-          <div className="flex items-center justify-center h-full">
-            <Skeleton className="w-3/4 h-3/4" />
+          <div className="flex items-center justify-center h-full bg-muted/30">
+            <div className="flex flex-col items-center gap-6 w-full max-w-4xl px-8">
+              <Skeleton className="w-full aspect-video rounded-lg" />
+              <div className="w-full flex gap-4">
+                <Skeleton className="h-10 flex-1" />
+                <Skeleton className="h-10 w-32" />
+              </div>
+              <div className="flex gap-2">
+                <Skeleton className="h-3 w-40" />
+                <Skeleton className="h-3 w-32" />
+              </div>
+            </div>
           </div>
         ) : item ? (
           <AnnotationCanvas
