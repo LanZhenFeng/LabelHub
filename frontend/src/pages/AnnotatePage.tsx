@@ -8,6 +8,7 @@ import {
   Trash2,
   Loader2,
   ChevronRight,
+  ChevronLeft,
   Keyboard,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -48,6 +49,8 @@ export default function AnnotatePage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [skipReason, setSkipReason] = useState('')
   const [imageLoaded, setImageLoaded] = useState(false)
+  const [itemHistory, setItemHistory] = useState<number[]>([])
+  const [currentItemId, setCurrentItemId] = useState<number | null>(null)
 
   // Fetch project for labels
   const { data: project } = useQuery({
@@ -111,6 +114,40 @@ export default function AnnotatePage() {
     },
   })
 
+  // Track item history for "previous" navigation
+  useEffect(() => {
+    if (item && item.id !== currentItemId) {
+      if (currentItemId !== null) {
+        setItemHistory(prev => [...prev, currentItemId])
+      }
+      setCurrentItemId(item.id)
+    }
+  }, [item, currentItemId])
+
+  // Go to previous item
+  const goToPreviousItem = useCallback(async () => {
+    if (itemHistory.length === 0) {
+      toast({ title: 'No previous item', description: 'You are at the first item' })
+      return
+    }
+    
+    const prevItemId = itemHistory[itemHistory.length - 1]
+    setItemHistory(prev => prev.slice(0, -1))
+    setCurrentItemId(prevItemId)
+    
+    try {
+      const prevItem = await itemsApi.get(prevItemId)
+      queryClient.setQueryData(['nextItem', datasetId], (old: typeof nextItemData) => ({
+        ...old,
+        item: prevItem,
+      }))
+      setSelectedLabel(null)
+      setImageLoaded(false)
+    } catch {
+      toast({ title: 'Error', description: 'Failed to load previous item', variant: 'destructive' })
+    }
+  }, [itemHistory, datasetId, queryClient, nextItemData, toast])
+
   // Handle label selection
   const handleSelectLabel = useCallback(
     (label: LabelType) => {
@@ -171,12 +208,16 @@ export default function AnnotatePage() {
             setDeleteDialogOpen(true)
           }
           break
+        case 'ArrowLeft':
+          e.preventDefault()
+          goToPreviousItem()
+          break
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [labels, handleSelectLabel, handleSubmit, handleNext])
+  }, [labels, handleSelectLabel, handleSubmit, handleNext, goToPreviousItem])
 
   // Pre-select label if item already has one
   useEffect(() => {
@@ -228,6 +269,17 @@ export default function AnnotatePage() {
             <ArrowLeft className="w-4 h-4" />
           </Button>
         </Link>
+
+        {/* Previous button */}
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={goToPreviousItem}
+          disabled={itemHistory.length === 0}
+          title="Previous (←)"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </Button>
 
         <div className="flex-1">
           <div className="flex items-center gap-4">
