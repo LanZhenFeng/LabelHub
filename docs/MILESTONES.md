@@ -1,8 +1,9 @@
 # LabelHub 里程碑交付计划
 
-> 版本：v1.0-MVP  
+> 版本：v1.0-MVP (修订版)  
 > 最后更新：2025-12-13  
-> 预计总工期：8-10 周
+> 预计总工期：8-10 周  
+> 变更：预标注改为 Parser Template 系统；明确缓存口径；统计以事件日志为数据源
 
 ---
 
@@ -28,32 +29,33 @@ Week 7-9    ░░░░░░░░░░░░░░░░░░░░░░�
 ### 📦 交付范围
 
 #### 后端 (FastAPI)
-- [x] 项目脚手架 (目录结构、配置管理、日志)
-- [x] 数据库模型 (Project, Dataset, Image, Annotation)
-- [x] 基础 CRUD API
+- 项目脚手架 (目录结构、配置管理、日志)
+- 数据库模型 (Project, Dataset, Image, Annotation, EventLog)
+- 基础 CRUD API
   - `POST/GET/PUT/DELETE /projects`
   - `POST/GET /datasets`
   - `GET /images` (分页)
   - `POST/GET /annotations`
-- [x] 文件上传接口 (单文件/批量)
-- [x] 缩略图生成服务 (Pillow, 200x200, WebP)
-- [x] 基础认证 (JWT)
+- 数据集导入接口 (服务器路径索引)
+- 缩略图生成服务 (Pillow, 200x200, WebP)
+- 基础认证 (JWT)
+- ETag 生成与 304 响应支持
 
 #### 前端 (React)
-- [x] 项目脚手架 (Vite + React + TypeScript)
-- [x] 路由配置 (React Router)
-- [x] 全局状态管理 (Zustand)
-- [x] API 层封装 (Axios + React Query)
-- [x] UI 组件库集成 (Ant Design)
-- [x] 基础布局 (Header, Sidebar, Content)
-- [x] 项目列表页
-- [x] 数据集页 (简单网格，非虚拟列表)
-- [x] 最简标注页 (图片展示 + 分类选择)
+- 项目脚手架 (Vite + React + TypeScript)
+- 路由配置 (React Router)
+- 全局状态管理 (Zustand)
+- API 层封装 (Axios + TanStack Query)
+- UI 组件库集成 (**Tailwind + shadcn/ui**)
+- 基础布局 (Header, Sidebar, Content)
+- 项目列表页
+- 数据集页 (简单网格，非虚拟列表)
+- 最简标注页 (图片展示 + 分类选择)
 
 #### DevOps
-- [x] Docker Compose 开发环境
-- [x] Makefile 常用命令
-- [x] README 快速启动指南
+- Docker Compose 开发环境
+- Makefile 常用命令
+- README 快速启动指南
 
 ### ✅ 验收标准
 
@@ -91,32 +93,32 @@ Week 7-9    ░░░░░░░░░░░░░░░░░░░░░░�
 ### 📦 交付范围
 
 #### 画布引擎
-- [x] Fabric.js 集成与封装
-- [x] 画布基础功能
+- **Fabric.js** 集成与封装
+- 画布基础功能
   - 图片加载与渲染
   - 缩放 (滚轮)
   - 平移 (空格+拖拽)
   - 重置视图 (双击)
-- [x] 矩形工具 (BBox)
+- 矩形工具 (BBox)
   - 拖拽绘制
   - 选中移动
   - 八方向调整大小
   - 删除
-- [x] 多边形工具 (Polygon)
+- 多边形工具 (Polygon)
   - 点击添加顶点
   - 双击/回车闭合
   - 顶点编辑 (拖拽移动)
   - 添加/删除顶点
-- [x] 标注属性
+- 标注属性
   - 类别选择
   - 属性面板 (遮挡/截断等)
 
 #### 快捷键系统
-- [x] 快捷键管理器
+- 快捷键管理器
   - 全局快捷键注册
   - 上下文感知 (画布/表单)
   - 冲突检测
-- [x] 已实现快捷键
+- 已实现快捷键
   - `V` 选择工具
   - `R` 矩形工具
   - `P` 多边形工具
@@ -127,26 +129,27 @@ Week 7-9    ░░░░░░░░░░░░░░░░░░░░░░�
   - `Enter` 提交下一张
   - `S` 跳过
   - `?` 显示帮助
-- [x] 快捷键提示 UI
+- 快捷键提示 UI
   - 侧边栏常驻提示
   - `?` 键弹出完整列表
 
-#### Undo/Redo 系统
-- [x] 操作历史栈 (容量 50)
-- [x] 支持操作类型
-  - 创建标注
-  - 删除标注
-  - 移动标注
-  - 调整大小
-  - 更改类别
-  - 批量操作
-- [x] 历史状态序列化/反序列化
+#### Undo/Redo 系统 (Command Pattern)
+- 操作历史栈 (容量 50)
+- Command 接口：`execute()`, `undo()`, `redo()`
+- 支持操作类型
+  - `AddObjectCommand` - 创建标注
+  - `RemoveObjectCommand` - 删除标注
+  - `ModifyObjectCommand` - 移动/调整大小
+  - `ChangePropertyCommand` - 更改类别
+  - `BatchCommand` - 批量操作
+- 历史状态序列化/反序列化
 
 #### 标注流程
-- [x] 跳过功能 (必填原因)
-- [x] 上一张/下一张导航
-- [x] 进度条显示
-- [x] 自动保存草稿 (localStorage)
+- 跳过功能 (**必填原因**)
+- 上一张/下一张导航
+- 进度条显示
+- 自动保存草稿 (localStorage)
+- 状态流转：todo → in_progress → done/skipped
 
 ### ✅ 验收标准
 
@@ -188,80 +191,106 @@ Week 7-9    ░░░░░░░░░░░░░░░░░░░░░░�
 #### 慢网优化
 
 **缩略图服务优化**
-- [x] 服务端缩略图预生成 (导入时异步生成)
-- [x] WebP 格式输出
-- [x] HTTP 缓存头 (ETag, Cache-Control)
-- [x] Nginx 静态文件服务 (可选)
+- 服务端缩略图预生成 (导入时异步生成)
+- WebP 格式输出
+- **HTTP 缓存口径** (必须遵循)
+  - 缩略图: `Cache-Control: public, max-age=86400, stale-while-revalidate=604800`
+  - 中图: `Cache-Control: public, max-age=3600, stale-while-revalidate=86400`
+  - 原图: `Cache-Control: public, max-age=3600`
+  - 所有图片支持 ETag + If-None-Match (304)
+- Nginx 静态文件服务 (绕过 Python)
 
 **前端预取与缓存**
-- [x] 虚拟列表 (react-virtualized / @tanstack/virtual)
+- 虚拟列表 (@tanstack/virtual)
   - 数据集页支持 10000+ 图片
   - 仅渲染可视区域
   - 滚动性能 60fps
-- [x] 图片预取策略
+- 图片预取策略
   - 当前图片加载后，预取后续 3 张
   - 使用 `<link rel="prefetch">` 或 Image 对象
   - 带宽感知 (navigator.connection)
-- [x] IndexedDB 缓存
+- IndexedDB 缓存
   - 缓存已加载图片 (Blob)
   - LRU 淘汰策略
   - 容量限制 200MB
-- [x] 骨架屏与加载状态
+- 骨架屏与加载状态
   - 列表骨架屏
   - 图片加载占位符 (LQIP)
   - 进度指示器
+- **Service Worker 策略**
+  - 静态资源: stale-while-revalidate
+  - 图片: cache-first + 后台刷新
 
-**乐观更新**
-- [x] 本地状态优先
-- [x] 后台批量同步 (防抖 1s)
-- [x] 冲突提示 (乐观锁 version 字段)
+**乐观锁与并发控制**
+- 本地状态优先
+- 后台批量同步 (防抖 1s)
+- **If-Match 乐观锁**
+  - 保存标注时携带 If-Match 头
+  - 412 Precondition Failed 表示冲突
+  - 前端提示"数据已被修改，请刷新"
 
-#### 预标注导入
+#### Parser Template 系统 (预标注导入)
 
-**格式支持**
-- [x] COCO JSON
-  - 解析 annotations, categories
-  - images 路径匹配
-- [x] YOLO TXT
-  - `class x_center y_center width height`
-  - 归一化坐标转换
-- [x] Pascal VOC XML
-  - 解析 `<object>` 标签
-  - 坐标转换
+> **核心变更**：不再写死 COCO/YOLO/VOC 解析器，而是提供声明式映射模板
 
-**导入流程**
-- [x] 上传预标注文件
-- [x] 格式自动检测
-- [x] 标签映射界面
+**后端实现**
+- ParserTemplate 数据模型 (name, description, mapping, validation)
+- **JMESPath** 表达式引擎集成 (`jmespath` Python 库)
+- Parser Template CRUD API
+  - `POST/GET/PUT/DELETE /api/v1/parser-templates`
+  - `POST /api/v1/parser-templates/test` (测试解析)
+- JSONL 流式解析 (不一次性读入内存)
+- 解析安全限制
+  - 表达式超时: 100ms/条
+  - 嵌套深度: 20 层
+  - 结果大小: 10MB/条
+- Pydantic 校验映射输出 (Prediction 格式)
+- 内置模板 (作为种子数据)
+  - `builtin_coco` - COCO JSON
+  - `builtin_yolo` - YOLO TXT (特殊处理)
+  - `builtin_voc` - Pascal VOC XML (特殊处理)
+
+**前端实现**
+- 导入页三栏布局
+  - 左栏: 输入文件上传 + 格式预览
+  - 中栏: 模板选择/编辑
+  - 右栏: 映射预览 (前 20 条) + 错误列表
+- 模板管理界面
+  - 选择内置/自定义模板
+  - 在线编辑模板 (YAML/JSON)
+  - 保存为新模板
+- 错误定位
+  - 行号 (JSONL) / 索引 (JSON)
+  - 错误字段高亮
+- 标签映射界面
   - 自动匹配同名标签
   - 手动映射未识别标签
   - 创建新标签选项
-- [x] 置信度过滤 (可选阈值)
-- [x] 预览确认 (随机 10 张样例)
-- [x] 冲突处理选项 (覆盖/跳过/合并)
-- [x] 导入进度显示
+- 置信度过滤滑块
+- 冲突处理选项 (覆盖/跳过/合并)
+- 导入进度显示 (大文件)
 
 **预标注展示与采纳**
-- [x] 预标注特殊样式 (虚线边框/透明填充)
-- [x] 操作按钮
-  - 采纳当前 (A)
-  - 采纳全部 (Shift+A)
+- 预标注特殊样式 (虚线边框/透明填充/不同颜色)
+- 操作按钮
+  - 采纳当前 (`A`)
+  - 采纳全部 (`Shift+A`)
   - 编辑后采纳
-  - 拒绝 (删除)
-- [x] 采纳统计追踪
+  - 拒绝/删除
+- 采纳统计追踪 (写入 EventLog)
 
 #### 数据导出
 
 **格式支持**
-- [x] COCO JSON
-- [x] YOLO TXT + classes.txt
-- [x] Pascal VOC XML
+- COCO JSON
+- YOLO TXT + classes.txt
+- Pascal VOC XML
 
 **导出选项**
-- [x] 筛选条件 (状态/日期/标签)
-- [x] 图片包含选项 (仅标注/含图片)
-- [x] 异步导出 (后台生成 ZIP)
-- [x] 下载链接通知
+- 筛选条件 (状态/日期/标签)
+- 图片包含选项 (仅标注/含图片)
+- 异步导出 (后台生成 ZIP)
+- 下载链接通知
 
 ### ✅ 验收标准
 
@@ -270,9 +299,12 @@ Week 7-9    ░░░░░░░░░░░░░░░░░░░░░░�
 | 虚拟列表 | 10000 张图片流畅滚动 (>30fps) |
 | 图片切换 | 下一张感知延迟 < 300ms (预取命中) |
 | 骨架屏 | 无白屏闪烁 |
-| COCO 导入 | 正确解析并显示预标注 |
-| YOLO 导入 | 坐标转换正确 |
-| 预标注采纳 | 一键采纳，快捷键可用 |
+| HTTP 缓存 | ETag/304 正常工作；If-Match/412 正常工作 |
+| **Parser Template** | 可创建/编辑/测试自定义模板 |
+| **内置模板** | COCO/YOLO/VOC 内置模板可用 |
+| **JSONL 流式** | 100MB JSONL 文件导入不 OOM |
+| **错误定位** | 解析错误显示行号/索引 |
+| 预标注采纳 | 一键采纳，快捷键 (A/Shift+A) 可用 |
 | 数据导出 | 三种格式导出正确 |
 
 ### ⚠️ 风险与缓解
@@ -281,12 +313,15 @@ Week 7-9    ░░░░░░░░░░░░░░░░░░░░░░�
 |------|------|------|----------|
 | IndexedDB 兼容性 | 中 | 低 | 降级为内存缓存；检测支持 |
 | 预取过度消耗带宽 | 中 | 中 | 带宽检测；用户可配置 |
-| 大文件导入 OOM | 高 | 中 | 流式解析；分批处理 |
+| **JMESPath 表达式复杂度** | 中 | 中 | 超时限制；示例模板引导 |
+| **JSONL 大文件流式解析** | 高 | 中 | ijson 流式库；分批提交 |
 | 坐标转换精度 | 中 | 低 | 单元测试；边界验证 |
 
 ### 📊 Definition of Done
 - [ ] 慢网 (模拟 3G) 下可正常标注
-- [ ] 预标注导入三种格式测试通过
+- [ ] Parser Template 系统可用 (CRUD + 测试)
+- [ ] 内置模板 (COCO/YOLO/VOC) 回归测试通过
+- [ ] 自定义模板可解析任意 JSON/JSONL
 - [ ] 预取命中率监控可用
 - [ ] 导出文件可被主流框架读取
 
@@ -303,68 +338,79 @@ Week 7-9    ░░░░░░░░░░░░░░░░░░░░░░�
 
 #### 效率统计 Dashboard
 
+> **数据源口径**：所有统计指标以 **EventLog (事件日志)** 为数据源，确保可追溯、可重算。
+> 不直接聚合业务表，而是通过事件流计算。
+
 **项目级统计**
-- [x] 总体进度
+- 总体进度
   - 完成率饼图
-  - 状态分布 (待标/进行中/已完成/跳过)
-- [x] 效率指标卡片
+  - 状态分布 (todo/in_progress/done/skipped)
+- 效率指标卡片
   - 平均标注耗时
   - 预标注采纳率
   - 跳过率
   - 日吞吐量
-- [x] 趋势图表
+- 趋势图表
   - 每日完成数趋势 (折线图)
   - 累计进度 (面积图)
-- [x] 类别分布
+- 类别分布
   - 各类别标注数量 (柱状图)
   - 类别占比 (饼图)
 
 **标注员统计** (管理员可见)
-- [x] 个人效率排名
-- [x] 人均耗时对比
-- [x] 贡献度统计
+- 个人效率排名
+- 人均耗时对比
+- 贡献度统计
 
 **数据计算**
-- [x] 后端统计 API
+- EventLog 数据模型
+  - `event_type`: annotation_start, annotation_submit, skip, adopt_prediction, etc.
+  - `user_id`, `project_id`, `image_id`
+  - `metadata`: JSON (耗时、来源等)
+  - `created_at`
+- 后端统计 API (基于 EventLog 聚合)
   - `/stats/overview` 总览
   - `/stats/daily` 每日明细
   - `/stats/annotators` 标注员统计
-- [x] 定时聚合任务 (可选，大数据量时)
-- [x] 数据导出 (CSV)
+- 定时聚合任务 (可选，大数据量时预计算)
+- 数据导出 (CSV)
 
 #### 用户体验完善
 
 **标注页优化**
-- [x] 图片调整
+- 图片调整 (P1，可推迟)
   - 亮度/对比度滑块
   - 旋转 (90°)
   - 水平/垂直翻转
-- [x] 标注图层管理
+- 标注图层管理
   - 显示/隐藏
   - 锁定/解锁
   - 上移/下移
-- [x] 标注列表
+- 标注列表
   - 点击定位
   - 快速编辑类别
   - 批量删除
 
 **全局体验**
-- [x] 深色模式支持
-- [x] 响应式布局优化 (平板适配)
-- [x] 错误提示优化 (Toast + 重试)
-- [x] 加载状态统一
-- [x] 空状态设计
+- 深色模式支持 (P1，可推迟)
+- 响应式布局优化 (平板适配)
+- 错误提示优化 (Toast + 重试)
+- 加载状态统一
+- 空状态设计
 
 **设置页面**
-- [x] 标签模板管理
+- 标签模板管理
   - 创建/编辑/删除
   - 颜色选择
   - 快捷键映射
-- [x] 快捷键自定义
+- 快捷键自定义
   - 查看当前键位
   - 自定义映射
   - 重置默认
-- [x] 显示偏好
+- Parser Template 管理
+  - 查看/编辑自定义模板
+  - 导入/导出模板
+- 显示偏好
   - 主题切换
   - 列表/网格视图
   - 缩略图大小
@@ -372,27 +418,28 @@ Week 7-9    ░░░░░░░░░░░░░░░░░░░░░░�
 #### 发布准备
 
 **文档**
-- [x] 用户指南 (使用说明)
-- [x] 部署文档 (Docker / 手动)
-- [x] API 文档 (自动生成 + 补充)
-- [x] 开发文档 (架构说明)
+- 用户指南 (使用说明)
+- 部署文档 (Docker / 手动)
+- API 文档 (自动生成 + 补充)
+- 开发文档 (架构说明)
+- **Parser Template 编写指南**
 
 **质量保障**
-- [x] E2E 测试 (Playwright)
+- E2E 测试 (Playwright)
   - 核心流程覆盖
   - 跨浏览器测试
-- [x] 性能测试
+- 性能测试
   - Lighthouse 评分 >80
   - 慢网模拟测试
-- [x] 安全检查
+- 安全检查
   - 依赖漏洞扫描
   - 基础渗透测试
 
 **部署**
-- [x] 生产 Docker 镜像
-- [x] docker-compose.prod.yml
-- [x] 环境变量文档
-- [x] 数据备份脚本
+- 生产 Docker 镜像
+- docker-compose.prod.yml
+- 环境变量文档
+- 数据备份脚本
 
 ### ✅ 验收标准
 
@@ -515,17 +562,22 @@ const trackAnnotation = {
 | 分割标注 (Polygon) | | ✓ | | | | |
 | 分割标注 (Mask) | | | | | ✓ | |
 | 快捷键系统 | | ✓ | | | | |
-| Undo/Redo | | ✓ | | | | |
+| Undo/Redo (Command) | | ✓ | | | | |
 | 虚拟列表 | | | ✓ | | | |
 | 图片预取 | | | ✓ | | | |
+| HTTP 缓存 (ETag/304) | | | ✓ | | | |
+| 乐观锁 (If-Match/412) | | | ✓ | | | |
 | IndexedDB 缓存 | | | ✓ | | | |
 | 骨架屏 | | | ✓ | | | |
-| 预标注导入 | | | ✓ | | | |
+| **Parser Template 系统** | | | ✓ | | | |
+| 内置模板 (COCO/YOLO/VOC) | | | ✓ | | | |
 | 数据导出 | | | ✓ | | | |
-| 效率 Dashboard | | | | ✓ | | |
-| 深色模式 | | | | ✓ | | |
+| 效率 Dashboard (EventLog) | | | | ✓ | | |
+| 深色模式 | | | | P1 | | |
 | 设置页面 | | | | ✓ | | |
+| Range/206 断点 | | | | | ✓ | |
 | 离线标注 | | | | | ✓ | |
+| JSONPath 兼容 | | | | | ✓ | |
 | 审阅工作流 | | | | | | ✓ |
 | 多人协作 | | | | | | ✓ |
 | AI 辅助 (SAM) | | | | | | ✓ |
@@ -560,9 +612,10 @@ const trackAnnotation = {
 
 ### M0 Checklist
 - [ ] 后端项目初始化完成
-- [ ] 数据库 Schema 设计评审通过
+- [ ] 数据库 Schema 设计评审通过 (含 EventLog)
 - [ ] API 端点实现并测试
-- [ ] 前端项目初始化完成
+- [ ] ETag 生成与 304 响应
+- [ ] 前端项目初始化完成 (Tailwind + shadcn/ui)
 - [ ] 基础页面布局完成
 - [ ] 分类标注流程可用
 - [ ] Docker 环境可用
@@ -572,25 +625,32 @@ const trackAnnotation = {
 - [ ] BBox 工具完整可用
 - [ ] Polygon 工具完整可用
 - [ ] 快捷键系统可用
-- [ ] Undo/Redo 系统可用
+- [ ] Undo/Redo 系统可用 (Command Pattern)
 - [ ] 无内存泄漏
+- [ ] 状态机 (todo/in_progress/done/skipped/deleted)
 
 ### M2 Checklist
 - [ ] 虚拟列表实现
 - [ ] 预取策略实现
+- [ ] HTTP 缓存口径落地 (Cache-Control/ETag/304)
+- [ ] 乐观锁落地 (If-Match/412)
 - [ ] IndexedDB 缓存实现
 - [ ] 骨架屏实现
-- [ ] COCO 导入可用
-- [ ] YOLO 导入可用
-- [ ] VOC 导入可用
+- [ ] **Parser Template CRUD API**
+- [ ] **JMESPath 表达式引擎集成**
+- [ ] **JSONL 流式解析**
+- [ ] **内置模板 (COCO/YOLO/VOC) 可用**
+- [ ] **导入页三栏界面完成**
+- [ ] **解析测试/预览功能完成**
 - [ ] 三种格式导出可用
 
 ### M3 Checklist
-- [ ] Dashboard 完成
-- [ ] 深色模式完成
+- [ ] Dashboard 完成 (基于 EventLog)
+- [ ] 深色模式完成 (P1，可推迟)
 - [ ] 设置页面完成
 - [ ] 用户文档完成
 - [ ] 部署文档完成
+- [ ] **Parser Template 编写指南完成**
 - [ ] E2E 测试通过
 - [ ] 性能测试通过
 - [ ] 安全检查通过
