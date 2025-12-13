@@ -419,11 +419,6 @@ export default function CanvasAnnotatePage() {
             <ChevronRight className="w-4 h-4" />
           </Button>
 
-          {/* Annotation count badge */}
-          <div className="px-3 py-1 bg-muted rounded-md text-sm font-medium">
-            {currentAnnotations.length}
-          </div>
-
           <Button
             variant="outline"
             size="sm"
@@ -487,7 +482,7 @@ export default function CanvasAnnotatePage() {
           <AnnotationCanvas
             imageUrl={item.image_url}
             labels={labels}
-            initialAnnotations={initialAnnotations}
+            initialAnnotations={currentAnnotations}
             onAnnotationsChange={handleAnnotationsChange}
             className="h-full"
           />
