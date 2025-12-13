@@ -57,21 +57,22 @@ export function useCanvas(options: UseCanvasOptions = {}) {
     setCanRedo(historyRef.current.canRedo())
   }, [])
 
+  // Notify parent when annotations change (using useEffect to avoid render-phase updates)
+  const annotationsRef = useRef(annotations)
+  useEffect(() => {
+    if (annotationsRef.current !== annotations) {
+      annotationsRef.current = annotations
+      onAnnotationsChange?.(annotations)
+    }
+  }, [annotations, onAnnotationsChange])
+
   // Annotation operations
   const addAnnotation = useCallback((annotation: AnnotationData) => {
-    setAnnotations(prev => {
-      const next = [...prev, annotation]
-      onAnnotationsChange?.(next)
-      return next
-    })
-  }, [onAnnotationsChange])
+    setAnnotations(prev => [...prev, annotation])
+  }, [])
 
   const removeAnnotation = useCallback((id: string) => {
-    setAnnotations(prev => {
-      const next = prev.filter(a => a.id !== id)
-      onAnnotationsChange?.(next)
-      return next
-    })
+    setAnnotations(prev => prev.filter(a => a.id !== id))
     // Remove from canvas
     const canvas = canvasRef.current
     if (canvas) {
@@ -81,15 +82,11 @@ export function useCanvas(options: UseCanvasOptions = {}) {
         canvas.requestRenderAll()
       }
     }
-  }, [onAnnotationsChange])
+  }, [])
 
   const updateAnnotation = useCallback((id: string, data: Partial<AnnotationData>) => {
-    setAnnotations(prev => {
-      const next = prev.map(a => a.id === id ? { ...a, ...data } as AnnotationData : a)
-      onAnnotationsChange?.(next)
-      return next
-    })
-  }, [onAnnotationsChange])
+    setAnnotations(prev => prev.map(a => a.id === id ? { ...a, ...data } as AnnotationData : a))
+  }, [])
 
   const updateAnnotationLabel = useCallback((id: string, labelId: number) => {
     updateAnnotation(id, { labelId })
@@ -138,10 +135,8 @@ export function useCanvas(options: UseCanvasOptions = {}) {
       const canvasWidth = img.width * scale
       const canvasHeight = img.height * scale
 
-      canvas.setDimensions({
-        width: canvasWidth,
-        height: canvasHeight,
-      })
+      canvas.setWidth(canvasWidth)
+      canvas.setHeight(canvasHeight)
 
       // Set background image
       FabricImage.fromURL(imageUrl, { crossOrigin: 'anonymous' }).then((fabricImg) => {
