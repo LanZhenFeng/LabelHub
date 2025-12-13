@@ -54,8 +54,8 @@ export default function Layout() {
         {/* Footer */}
         <div className="p-4 border-t">
           <div className="text-xs text-muted-foreground space-y-0.5">
-            <p className="font-medium">LabelHub v0.3.0</p>
-            <p>M2 - Efficiency & Pre-annotation</p>
+            <p className="font-medium">LabelHub v1.0.0</p>
+            <p>M3 - Statistics & Polish</p>
             <p className="text-[10px] opacity-70">Apache License 2.0</p>
           </div>
         </div>
