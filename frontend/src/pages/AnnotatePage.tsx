@@ -136,7 +136,7 @@ export default function AnnotatePage() {
     }
   }, [item, datasetId, queryClient, nextItemData, toast])
 
-  // Go to next item (by order, not next unannotated)
+  // Go to next processed item (skip todo items)
   const goToNextItem = useCallback(async () => {
     if (!item) return
     
@@ -144,6 +144,16 @@ export default function AnnotatePage() {
       const nextItem = await itemsApi.getNextByOrder(item.id)
       if (!nextItem) {
         toast({ title: 'No next item', description: 'This is the last item' })
+        return
+      }
+      
+      // Check if next item is unprocessed (todo)
+      if (nextItem.status === 'todo') {
+        toast({ 
+          title: 'Cannot skip forward', 
+          description: 'Please use Submit or Skip to proceed to unannotated items',
+          variant: 'default'
+        })
         return
       }
       
@@ -406,9 +416,9 @@ export default function AnnotatePage() {
           {/* Actions */}
           <div className="p-4 border-t space-y-3">
             {/* Navigation buttons */}
-            <div className="flex gap-2 mb-2">
+            <div className="flex gap-2">
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
                 className="flex-1"
                 onClick={goToPreviousItem}
@@ -418,7 +428,7 @@ export default function AnnotatePage() {
                 Previous
               </Button>
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
                 className="flex-1"
                 onClick={goToNextItem}
