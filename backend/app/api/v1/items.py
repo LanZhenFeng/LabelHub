@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +14,7 @@ from app.models.dataset import Dataset
 from app.models.item import Item, ItemStatus
 from app.schemas.item import ItemListResponse, ItemResponse, NextItemResponse
 from app.services.thumbs import ThumbnailService
+from app.services.cache import check_not_modified, add_cache_headers
 
 router = APIRouter()
 
@@ -240,10 +241,11 @@ async def get_next_item_by_order(
 @router.get("/items/{item_id}/thumb")
 async def get_thumbnail(
     item_id: int,
+    request: Request,
     size: int = Query(256, ge=64, le=512),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get thumbnail for an item."""
+    """Get thumbnail for an item with HTTP caching support."""
     # Get item with dataset
     query = select(Item).options(selectinload(Item.dataset)).where(Item.id == item_id)
     result = await db.execute(query)
@@ -265,22 +267,31 @@ async def get_thumbnail(
     if not thumb_path or not thumb_path.exists():
         raise HTTPException(status_code=500, detail="Failed to generate thumbnail")
 
-    return FileResponse(
+    # Check if not modified (304 response)
+    not_modified_response = check_not_modified(request, thumb_path)
+    if not_modified_response:
+        return not_modified_response
+
+    # Return file with cache headers
+    response = FileResponse(
         thumb_path,
         media_type="image/webp",
-        headers={
-            "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
-        },
+    )
+    return add_cache_headers(
+        response,
+        thumb_path,
+        cache_control="public, max-age=86400, stale-while-revalidate=604800",
     )
 
 
 @router.get("/items/{item_id}/image")
 async def get_image(
     item_id: int,
+    request: Request,
     variant: str = Query("orig", regex="^(orig|medium)$"),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get original image for an item."""
+    """Get original or medium image for an item with HTTP caching support."""
     # Get item with dataset
     query = select(Item).options(selectinload(Item.dataset)).where(Item.id == item_id)
     result = await db.execute(query)
@@ -295,6 +306,11 @@ async def get_image(
     if not full_path.exists():
         raise HTTPException(status_code=404, detail="Image file not found")
 
+    # Check if not modified (304 response)
+    not_modified_response = check_not_modified(request, full_path)
+    if not_modified_response:
+        return not_modified_response
+
     # Determine media type from extension
     extension = full_path.suffix.lower()
     media_types = {
@@ -306,13 +322,14 @@ async def get_image(
     }
     media_type = media_types.get(extension, "application/octet-stream")
 
-    return FileResponse(
-        full_path,
-        media_type=media_type,
-        headers={
-            "Cache-Control": "public, max-age=3600",
-        },
+    # Return file with cache headers
+    cache_control = (
+        "public, max-age=3600, stale-while-revalidate=86400"
+        if variant == "medium"
+        else "public, max-age=3600"
     )
+    response = FileResponse(full_path, media_type=media_type)
+    return add_cache_headers(response, full_path, cache_control=cache_control)
 
 
 def _item_to_response(item: Item, root_path: str) -> ItemResponse:
