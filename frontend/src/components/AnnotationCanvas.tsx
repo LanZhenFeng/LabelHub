@@ -82,8 +82,10 @@ export function AnnotationCanvas({
   useEffect(() => {
     if (containerRef.current && imageUrl) {
       initCanvas(containerRef.current, imageUrl)
+      // Reset tool to select when image changes
+      setTool('select')
     }
-  }, [imageUrl, initCanvas])
+  }, [imageUrl, initCanvas, setTool])
 
   // Load initial annotations when they change
   // Use a ref to track the stringified version to avoid unnecessary re-renders

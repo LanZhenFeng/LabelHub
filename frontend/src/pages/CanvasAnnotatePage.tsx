@@ -186,7 +186,7 @@ export default function CanvasAnnotatePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['items', datasetId] })
       queryClient.invalidateQueries({ queryKey: ['nextItem', datasetId] })
-      setCurrentAnnotations([])
+      // Don't manually clear - let useEffect handle it when new item loads
       setIsDirty(false)
       refetchNextItem()
       toast({ title: 'Submitted', description: 'Item marked as done' })
@@ -205,7 +205,6 @@ export default function CanvasAnnotatePage() {
       queryClient.invalidateQueries({ queryKey: ['nextItem', datasetId] })
       setSkipDialogOpen(false)
       setSkipReason('')
-      setCurrentAnnotations([])
       setIsDirty(false)
       refetchNextItem()
       toast({ title: 'Skipped', description: 'Item has been skipped' })
@@ -219,7 +218,6 @@ export default function CanvasAnnotatePage() {
       queryClient.invalidateQueries({ queryKey: ['items', datasetId] })
       queryClient.invalidateQueries({ queryKey: ['nextItem', datasetId] })
       setDeleteDialogOpen(false)
-      setCurrentAnnotations([])
       setIsDirty(false)
       refetchNextItem()
       toast({ title: 'Deleted', description: 'Item has been deleted' })
