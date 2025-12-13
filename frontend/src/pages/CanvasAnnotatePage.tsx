@@ -253,6 +253,36 @@ export default function CanvasAnnotatePage() {
     }
   }, [item, datasetId, queryClient, nextItemData, toast])
 
+  // Go to next processed item (skip todo items)
+  const goToNextItem = useCallback(async () => {
+    if (!item) return
+    
+    try {
+      const nextItem = await itemsApi.getNextByOrder(item.id)
+      if (!nextItem) {
+        toast({ title: 'No next item', description: 'This is the last item' })
+        return
+      }
+      
+      // Check if next item is unprocessed (todo)
+      if (nextItem.status === 'todo') {
+        toast({ 
+          title: 'Cannot skip forward', 
+          description: 'Please use Submit or Skip to proceed to unannotated items',
+          variant: 'default'
+        })
+        return
+      }
+      
+      queryClient.setQueryData(['nextItem', datasetId], (old: typeof nextItemData) => ({
+        ...old,
+        item: nextItem,
+      }))
+    } catch {
+      toast({ title: 'Error', description: 'Failed to load next item', variant: 'destructive' })
+    }
+  }, [item, datasetId, queryClient, nextItemData, toast])
+
   // Handle right-click to submit
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
@@ -300,12 +330,16 @@ export default function CanvasAnnotatePage() {
           e.preventDefault()
           goToPreviousItem()
           break
+        case 'ArrowRight':
+          e.preventDefault()
+          goToNextItem()
+          break
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [currentAnnotations, submitMutation, saveMutation, goToPreviousItem])
+  }, [currentAnnotations, submitMutation, saveMutation, goToPreviousItem, goToNextItem])
 
   const progress = nextItemData
     ? (nextItemData.done_count / Math.max(nextItemData.total_count, 1)) * 100
@@ -367,16 +401,28 @@ export default function CanvasAnnotatePage() {
 
         {/* Actions */}
         <div className="flex items-center gap-2">
-          {/* Previous button */}
+          {/* Navigation buttons */}
           <Button
             variant="outline"
             size="sm"
             onClick={goToPreviousItem}
-            disabled={false}
             title="Previous (←)"
           >
             <ChevronLeft className="w-4 h-4" />
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={goToNextItem}
+            title="Next (→)"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+
+          {/* Annotation count badge */}
+          <div className="px-3 py-1 bg-muted rounded-md text-sm font-medium">
+            {currentAnnotations.length}
+          </div>
 
           <Button
             variant="outline"
