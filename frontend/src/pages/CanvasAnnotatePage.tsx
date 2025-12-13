@@ -121,15 +121,21 @@ export default function CanvasAnnotatePage() {
     return [...bboxes, ...polygons]
   }, [existingAnnotations])
 
-  // Sync currentAnnotations with initialAnnotations when they're ready
-  // This ensures annotations are loaded when returning to an annotated item
+  // Sync currentAnnotations with initialAnnotations
+  // Only update when item changes (not on every initialAnnotations reference change)
   const prevItemIdRef = useRef<number | null>(null)
+  const prevAnnotationsRef = useRef<AnnotationData[]>([])
+  
   useEffect(() => {
-    if (item?.id !== prevItemIdRef.current) {
-      // Item changed, reset to initial annotations
+    const itemChanged = item?.id !== prevItemIdRef.current
+    const annotationsChanged = JSON.stringify(initialAnnotations) !== JSON.stringify(prevAnnotationsRef.current)
+    
+    if (itemChanged || annotationsChanged) {
+      console.log('Updating annotations:', { itemId: item?.id, count: initialAnnotations.length, itemChanged, annotationsChanged })
       setCurrentAnnotations(initialAnnotations)
       setIsDirty(false)
       prevItemIdRef.current = item?.id || null
+      prevAnnotationsRef.current = initialAnnotations
     }
   }, [item?.id, initialAnnotations])
 
@@ -241,8 +247,7 @@ export default function CanvasAnnotatePage() {
         ...old,
         item: prevItem,
       }))
-      setCurrentAnnotations([])
-      setIsDirty(false)
+      // Don't manually clear - let useEffect handle it
     } catch {
       toast({ title: 'No previous item', description: 'This is the first item' })
     }

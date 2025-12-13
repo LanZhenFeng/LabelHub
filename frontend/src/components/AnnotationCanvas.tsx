@@ -85,16 +85,22 @@ export function AnnotationCanvas({
     }
   }, [imageUrl, initCanvas])
 
-  // Load initial annotations when imageUrl changes (new item loaded)
+  // Load initial annotations when they change
+  // Use a ref to track the stringified version to avoid unnecessary re-renders
+  const prevAnnotationsRef = useRef<string>('')
   useEffect(() => {
     if (imageUrl && labels.length > 0) {
-      // Always call loadAnnotations, even if empty (to clear previous annotations)
-      loadAnnotations(
-        initialAnnotations,
-        labels.map(l => ({ id: l.id, color: l.color }))
-      )
+      const annotationsStr = JSON.stringify(initialAnnotations)
+      if (annotationsStr !== prevAnnotationsRef.current) {
+        console.log('AnnotationCanvas: Loading annotations', { count: initialAnnotations.length, imageUrl })
+        loadAnnotations(
+          initialAnnotations,
+          labels.map(l => ({ id: l.id, color: l.color }))
+        )
+        prevAnnotationsRef.current = annotationsStr
+      }
     }
-  }, [imageUrl, labels, loadAnnotations]) // Depend on imageUrl instead of initialAnnotations
+  }, [imageUrl, labels, initialAnnotations, loadAnnotations])
 
   // Set default label if not selected
   useEffect(() => {
