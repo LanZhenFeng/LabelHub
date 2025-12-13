@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.api.v1 import annotations, datasets, health, items, labels, projects
+from app.api.v1 import annotations, datasets, health, items, labels, projects, export as export_router
 
 router = APIRouter(prefix="/api/v1")
 
@@ -12,4 +12,5 @@ router.include_router(datasets.router, tags=["Datasets"])
 router.include_router(items.router, tags=["Items"])
 router.include_router(labels.router, tags=["Labels"])
 router.include_router(annotations.router, tags=["Annotations"])
+router.include_router(export_router.router, tags=["Export"])
 

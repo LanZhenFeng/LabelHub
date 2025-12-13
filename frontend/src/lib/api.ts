@@ -109,6 +109,20 @@ export const datasetsApi = {
   delete: (datasetId: number) => api.delete(`/datasets/${datasetId}`),
   scan: (datasetId: number, data?: { glob?: string; limit?: number }) =>
     api.post<ScanResponse>(`/datasets/${datasetId}/scan`, data || {}).then((r) => r.data),
+  export: async (datasetId: number, format: 'coco' | 'yolo' | 'voc', includeImages: boolean = false) => {
+    const response = await api.post(`/datasets/${datasetId}/export?format=${format}&include_images=${includeImages}`, null, {
+      responseType: 'blob',
+    })
+    // Create download link
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `export_${format}_${Date.now()}.zip`)
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+  },
 }
 
 export const itemsApi = {
