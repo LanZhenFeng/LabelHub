@@ -1,8 +1,9 @@
 # LabelHub MVP 产品需求文档 (PRD)
 
-> 版本：v1.0-MVP  
+> 版本：v1.0-MVP (修订版)  
 > 最后更新：2025-12-13  
-> 目标：打造高效、易用的开源数据标注平台，以**提升标注效率**为第一目标
+> 目标：打造高效、易用的开源数据标注平台，以**提升标注效率**为第一目标  
+> 变更：新增 Parser Template 系统、HTTP 缓存口径、技术选型锁定
 
 ---
 
@@ -55,8 +56,8 @@
 | ID | 用户故事 | 验收标准 | 优先级 |
 |----|----------|----------|--------|
 | M-01 | 作为管理员，我想创建新项目并配置标注类型 | 选择：分类/检测/分割；定义类别标签 | P0 |
-| M-02 | 作为管理员，我想上传/导入数据集 | 支持：文件夹路径/ZIP上传；显示导入进度 | P0 |
-| M-03 | 作为管理员，我想导入预标注数据 | 支持 COCO/YOLO/VOC 格式；映射标签 | P0 |
+| M-02 | 作为管理员，我想导入数据集 | **优先**：服务器路径索引/对象存储引用；**可选**：ZIP上传(v1.1) | P0 |
+| M-03 | 作为管理员，我想导入预标注数据 | Parser Template 系统：任意 JSON/JSONL + 声明式映射；内置 COCO/YOLO/VOC 模板 | P0 |
 | M-04 | 作为管理员，我想查看项目进度和统计 | Dashboard：完成率、日吞吐、人均效率 | P0 |
 | M-05 | 作为管理员，我想导出标注结果 | 支持 COCO/YOLO/VOC 格式；增量导出 | P0 |
 | M-06 | 作为管理员，我想配置项目的标签模板 | 预设类别+颜色+快捷键映射 | P1 |
@@ -86,21 +87,166 @@
 
 ### 3.2 核心功能模块
 
-#### 3.2.1 预标注导入 (Pre-annotation)
+#### 3.2.1 预标注导入 - Parser Template 系统
 
-```
-支持格式：
-├── COCO JSON (instances, categories)
-├── YOLO TXT (class x_center y_center width height)
-├── Pascal VOC XML
-└── 自定义 JSON Schema
+> **设计原则**：不写死格式解析器，而是提供声明式映射模板，支持任意 JSON/JSONL 输入。
+
+##### 3.2.1.1 输入格式
+
+| 格式 | 说明 | 要求 |
+|------|------|------|
+| **JSON** | 单个 JSON 文件 | 完整加载后解析 |
+| **JSONL** | 每行一个 JSON record | **必须流式解析**，不一次性读入内存 |
+
+##### 3.2.1.2 模板语言：JMESPath
+
+- **首选**：[JMESPath](https://jmespath.org/) - 成熟、安全、易学
+- **可选兼容**：RFC 9535 JSONPath (v1.1 考虑，需评估库成熟度)
+- **兼容策略**：MVP 仅实现 JMESPath；若后续支持 JSONPath，模板需声明 `lang: jmespath | jsonpath`
+
+##### 3.2.1.3 模板结构 (ParserTemplate)
+
+```yaml
+# 模板元信息
+name: "custom_detection_v1"
+description: "自定义检测格式模板"
+version: "1.0"
+lang: "jmespath"              # 表达式语言
+
+# 输入配置
+input:
+  type: "jsonl"               # json | jsonl
+  record_path: null           # JSON 时指定记录数组路径，如 "data.images[*]"
+  encoding: "utf-8"
+
+# 字段映射
+mapping:
+  image_key: "file"           # 图片文件名/路径字段 (必填)
+  annotations_path: "objects" # 标注数组路径 (必填)
+
+  annotation:
+    label: "cls"              # 类别字段 (必填)
+    score: "conf"             # 置信度 (可选，0-1)
+    
+    # 标注类型 (三选一)
+    bbox:
+      path: "box"             # 坐标数组路径
+      format: "xyxy"          # xyxy | xywh | cxcywh
+      normalized: false       # 是否归一化坐标 (自动检测 <1 则为归一化)
+    
+    polygon:
+      path: "segmentation"
+      format: "flat"          # flat: [x1,y1,x2,y2,...] | nested: [[x1,y1],[x2,y2],...]
+    
+    classification:
+      path: "category"        # 图片级分类字段
+
+# 高级：跨数组关联 (如 COCO 的 images + annotations 分离)
+lookup:
+  annotations_by_image: "annotations[?image_id==`{image_id}`]"
+  categories_map: "categories[*].{id: id, name: name}"
+
+# 校验规则
+validation:
+  required_fields: ["file", "objects"]
+  score_range: [0.0, 1.0]
+  label_whitelist: null       # null 表示不限制
 ```
 
-**功能要点：**
-- 标签映射：自动匹配 + 手动映射未识别标签
-- 冲突处理：覆盖/跳过/合并
-- 置信度过滤：可设置阈值过滤低置信度预标注
-- 预览确认：导入前预览 10 张样例
+##### 3.2.1.4 内部 Prediction 格式 (统一输出)
+
+```typescript
+interface Prediction {
+  image_key: string;          // 文件名/路径，用于匹配 Image 记录
+  predictions: PredictionItem[];
+}
+
+interface PredictionItem {
+  type: "classification" | "bbox" | "polygon";
+  label: string;
+  score?: number;             // 0-1，可选
+  data: ClassificationData | BBoxData | PolygonData;
+}
+
+interface BBoxData {
+  x: number;      // 左上角 x (像素)
+  y: number;      // 左上角 y (像素)
+  width: number;
+  height: number;
+}
+
+interface PolygonData {
+  points: [number, number][];  // [[x1,y1], [x2,y2], ...]
+}
+
+interface ClassificationData {
+  value: string | string[];    // 单标签或多标签
+}
+```
+
+##### 3.2.1.5 导入体验
+
+| 功能 | 要求 |
+|------|------|
+| **格式自动检测** | 根据文件扩展名和内容嗅探 |
+| **模板选择** | 下拉选择内置模板 / 已保存模板 / 新建模板 |
+| **测试预览** | 解析前 **20 条** 记录，显示映射结果 |
+| **错误定位** | 错误信息包含 **行号**(JSONL) 或 **记录索引**(JSON) |
+| **标签映射** | 自动匹配同名标签；未匹配标签显示映射界面 |
+| **置信度过滤** | 可设置阈值 (默认 0，即不过滤) |
+| **冲突处理** | 覆盖 / 跳过 / 合并 (同一图片已有标注时) |
+| **进度显示** | 大文件显示进度条 + 预计剩余时间 |
+
+##### 3.2.1.6 校验机制
+
+| 层级 | 实现 |
+|------|------|
+| **输入校验** | 可选 JSON Schema 校验原始输入 |
+| **映射校验** | Pydantic 校验映射后的 Prediction 结构 |
+| **业务校验** | 坐标范围、标签存在性、必填字段 |
+
+##### 3.2.1.7 安全限制
+
+| 限制项 | 值 | 说明 |
+|--------|-----|------|
+| **执行模式** | 纯表达式 | 禁止任意代码执行 |
+| **表达式超时** | 100ms/条 | 单条记录解析超时 |
+| **嵌套深度** | 20 层 | 防止深度嵌套攻击 |
+| **结果大小** | 10MB/条 | 防止内存爆炸 |
+| **文件大小** | 1GB | 单个导入文件上限 |
+
+##### 3.2.1.8 内置模板
+
+系统预置以下模板，**作为示例 + 回归测试数据**：
+
+| 模板名 | 格式 | 支持类型 |
+|--------|------|----------|
+| `builtin_coco` | JSON | bbox, polygon |
+| `builtin_yolo` | TXT (特殊处理) | bbox |
+| `builtin_voc` | XML (特殊处理) | bbox |
+
+> **注意**：YOLO TXT 和 VOC XML 非 JSON 格式，作为**内置解析器**实现，但对外暴露为模板选项，保持界面一致性。
+
+##### 3.2.1.9 API 端点
+
+```yaml
+# Parser Template CRUD
+POST   /api/v1/parser-templates           # 创建模板
+GET    /api/v1/parser-templates           # 模板列表 (含内置)
+GET    /api/v1/parser-templates/{id}      # 模板详情
+PUT    /api/v1/parser-templates/{id}      # 更新模板
+DELETE /api/v1/parser-templates/{id}      # 删除模板 (内置不可删)
+
+# 解析测试
+POST   /api/v1/parser-templates/test      # 测试解析 (前 20 条)
+  # Body: { template_id | template_def, file: <upload> }
+  # Response: { success: bool, records: [...], errors: [{line, message}] }
+
+# 执行导入
+POST   /api/v1/datasets/{id}/import-predictions  # 导入预标注
+  # Body: { template_id, file: <upload>, options: {conflict, score_threshold} }
+  # Response: { job_id } -> 异步任务
+```
 
 #### 3.2.2 标注画布 (Annotation Canvas)
 
@@ -270,28 +416,127 @@ LabelHub
 | **缩略图加载** | 无白屏 | 服务端生成缩略图；渐进式加载；LQIP |
 | **长列表滚动** | 60fps | 虚拟列表(仅渲染可视区)；交叉观察器懒加载 |
 | **操作响应** | < 100ms | 乐观更新；本地状态优先；后台同步 |
-| **画布渲染** | 60fps | Canvas 2D / WebGL；离屏渲染大图 |
+| **画布渲染** | 60fps | Canvas 2D；离屏渲染大图 |
 
-**网络优化策略：**
+#### 5.1.1 HTTP 缓存口径 (必须遵循)
+
+##### 图片资源缓存策略
+
+| 资源类型 | 尺寸 | Cache-Control | ETag | 说明 |
+|----------|------|---------------|------|------|
+| **缩略图** | 200x200 | `public, max-age=86400, stale-while-revalidate=604800` | ✅ 基于内容哈希 | 24h 强缓存，7d 可用旧版 |
+| **中图** | 800px 宽 | `public, max-age=3600, stale-while-revalidate=86400` | ✅ 基于内容哈希 | 1h 强缓存，标注页预览用 |
+| **原图** | 原始尺寸 | `public, max-age=3600` | ✅ 基于文件修改时间 | 1h 强缓存 |
+
+##### 条件请求 (304 Not Modified)
+
+```http
+# 请求
+GET /api/v1/images/{id}/thumbnail
+If-None-Match: "abc123"
+
+# 响应 (未修改)
+HTTP/1.1 304 Not Modified
+ETag: "abc123"
+
+# 响应 (已修改)
+HTTP/1.1 200 OK
+ETag: "def456"
+Content-Type: image/webp
+```
+
+##### 大文件断点续传 (Range/206)
+
+> **MVP 可选，v1.1 必做**
+
+```http
+# 请求原图的部分内容
+GET /api/v1/images/{id}/file
+Range: bytes=0-1048575
+
+# 响应
+HTTP/1.1 206 Partial Content
+Content-Range: bytes 0-1048575/5242880
+Accept-Ranges: bytes
+```
+
+##### 乐观锁与并发控制
+
+**保存标注时使用 If-Match 头防止并发冲突：**
+
+```http
+# 获取标注 (返回 ETag)
+GET /api/v1/images/{id}/annotations
+ETag: "v3"
+
+# 提交更新 (带 If-Match)
+PUT /api/v1/images/{id}/annotations
+If-Match: "v3"
+Content-Type: application/json
+
+{"annotations": [...]}
+```
+
+**冲突响应：**
+
+| 状态码 | 场景 | 响应体 |
+|--------|------|--------|
+| `200 OK` | 更新成功 | `{"etag": "v4", "data": {...}}` |
+| `412 Precondition Failed` | ETag 不匹配 (被他人修改) | `{"error": "conflict", "current_etag": "v5", "message": "数据已被修改，请刷新后重试"}` |
+| `409 Conflict` | 业务冲突 (如状态不允许) | `{"error": "invalid_state", "message": "该任务已被跳过"}` |
+
+> **选择 412 而非 409**：412 明确表示"条件请求失败"，语义更准确；409 用于业务逻辑冲突。
+
+##### Service Worker 缓存策略
+
+| 资源类型 | 策略 | 说明 |
+|----------|------|------|
+| **静态资源** (JS/CSS/字体) | `stale-while-revalidate` | 优先用缓存，后台更新 |
+| **HTML** | `network-first` | 优先网络，离线用缓存 |
+| **图片 (缩略图/中图)** | `cache-first` + 后台刷新 | 命中缓存直接返回，后台检查更新 |
+| **API 数据** | `network-first` | 优先网络，离线用缓存 (v1.1 离线支持) |
+
+```javascript
+// SW 缓存策略示例
+workbox.routing.registerRoute(
+  /\/api\/v1\/images\/\d+\/thumbnail/,
+  new workbox.strategies.CacheFirst({
+    cacheName: 'thumbnails',
+    plugins: [
+      new workbox.expiration.ExpirationPlugin({
+        maxEntries: 500,
+        maxAgeSeconds: 7 * 24 * 60 * 60, // 7 days
+      }),
+      new workbox.backgroundSync.BackgroundSyncPlugin('thumbnail-refresh'),
+    ],
+  })
+);
+```
+
+#### 5.1.2 预取与本地缓存策略
+
 ```
 1. 缩略图服务
-   - 服务端预生成 200x200 缩略图
-   - WebP 格式压缩
-   - CDN / Nginx 缓存
+   - 服务端预生成 200x200 缩略图 (WebP 格式)
+   - Nginx 直接服务静态文件 (绕过 Python)
+   - 遵循上述 Cache-Control 策略
 
 2. 预取策略
    - 当前图片加载完成后，预取后续 3 张原图
    - 空闲时预取当前 ±5 范围的缩略图
    - 使用 Intersection Observer + requestIdleCallback
+   - 带宽感知：navigator.connection.effectiveType < '4g' 时减少预取数量
 
-3. 本地缓存
-   - IndexedDB 缓存已加载图片 (LRU, 上限 200MB)
-   - Service Worker 缓存静态资源
-   - localStorage 缓存用户配置 & 草稿
+3. 本地缓存 (IndexedDB)
+   - 缓存已加载图片 Blob (LRU 淘汰)
+   - 容量上限：200MB
+   - 优先缓存中图 (标注页用)，其次原图
+   - 提供缓存命中率统计
 
 4. 增量同步
-   - 标注结果本地暂存，批量提交 (每 30s / 切换时)
-   - 冲突检测 & 合并策略
+   - 标注结果本地暂存 (localStorage)
+   - 批量提交：防抖 1s / 切换图片时 / 手动保存
+   - 冲突处理：提示用户"数据已被修改"，提供覆盖/合并选项
 ```
 
 ### 5.2 可用性需求 ♿
@@ -364,6 +609,9 @@ LabelHub
 
 ## 6. 效率 KPI 定义
 
+> **数据源口径**：所有统计指标均以 **事件日志 (Event Log)** 为数据源，而非直接查询业务表。  
+> 事件日志记录每次状态变更、操作完成等关键事件，确保统计可追溯、可重算。
+
 ### 6.1 核心效率指标
 
 | 指标 | 定义 | 计算公式 | 目标值 |
@@ -429,7 +677,9 @@ LabelHub
 │ created_at  │     │ created_at  │     │ thumbnail   │
 │ updated_at  │     │ updated_at  │     │ width       │
 └─────────────┘     └─────────────┘     │ height      │
-                                        │ status      │
+                                        │ status      │  ← todo/in_progress/done/skipped/deleted
+                                        │ version     │  ← 乐观锁版本号
+                                        │ skip_reason │
                                         │ created_at  │
                                         └──────┬──────┘
                                                │
@@ -448,18 +698,81 @@ LabelHub
              │ created_at  │     │ created_at  │
              │ updated_at  │     └─────────────┘
              └─────────────┘
+
+┌─────────────────┐     ┌─────────────────┐
+│ ParserTemplate  │     │    EventLog     │
+├─────────────────┤     ├─────────────────┤
+│ id              │     │ id              │
+│ name            │     │ event_type      │  ← annotation_start/submit/skip/adopt...
+│ description     │     │ user_id         │
+│ is_builtin      │     │ project_id      │
+│ lang            │  ← jmespath/jsonpath  │ image_id        │
+│ input_config    │  ← JSON              │ metadata (JSON) │  ← 耗时、来源等
+│ mapping (JSON)  │     │ created_at      │
+│ validation      │  ← JSON              └─────────────────┘
+│ created_at      │
+│ updated_at      │
+└─────────────────┘
 ```
+
+**ParserTemplate 字段说明：**
+- `is_builtin`: 内置模板不可删除/修改
+- `lang`: 表达式语言，MVP 仅支持 `jmespath`
+- `input_config`: `{type, record_path, encoding}`
+- `mapping`: 字段映射配置 (见 §3.2.1.3)
+- `validation`: 校验规则配置
+
+**EventLog 事件类型：**
+| event_type | 说明 | metadata |
+|------------|------|----------|
+| `annotation_start` | 开始标注 | `{timestamp}` |
+| `annotation_submit` | 提交标注 | `{duration_ms, annotation_count}` |
+| `annotation_skip` | 跳过 | `{reason}` |
+| `prediction_adopt` | 采纳预标注 | `{modified: bool}` |
+| `prediction_reject` | 拒绝预标注 | - |
+| `image_load` | 图片加载 | `{duration_ms, from_cache}` |
 
 ### 7.2 状态机
 
+**Item (图片) 状态枚举：**
+
+| 状态 | 说明 | 可转换到 |
+|------|------|----------|
+| `todo` | 待标注 (初始状态) | `in_progress`, `skipped`, `deleted` |
+| `in_progress` | 标注中 (有草稿) | `done`, `skipped`, `todo`, `deleted` |
+| `done` | 已完成 | `in_progress` (重新编辑), `skipped`, `deleted`, `rejected` (v2) |
+| `skipped` | 已跳过 (**必填原因**) | `todo`, `deleted` |
+| `deleted` | 软删除 | `todo` (恢复) |
+| `rejected` | 被退回 (v2) | `in_progress` |
+
 ```
-Image Status:
-  pending ──[开始标注]──> in_progress ──[提交]──> completed
-     │                        │                      │
-     └────[跳过]────> skipped <──[取消跳过]──────────┘
-                                                     │
-                                        [退回(v2)]───┘
+                                    ┌─────────────┐
+                                    │   deleted   │ (软删除，可恢复)
+                                    └──────▲──────┘
+                                           │ [删除]
+     ┌─────────────────────────────────────┼─────────────────────────┐
+     │                                     │                         │
+     ▼                                     │                         │
+┌─────────┐  [开始]   ┌─────────────┐  [提交]  ┌─────────┐         │
+│  todo   │─────────>│ in_progress │────────>│  done   │         │
+└────┬────┘          └──────┬──────┘          └────┬────┘         │
+     │                      │                      │               │
+     │ [跳过]               │ [跳过]               │ [重编辑]      │
+     │                      │                      │               │
+     ▼                      ▼                      │               │
+┌─────────────────────────────────┐               │               │
+│           skipped               │<──────────────┘               │
+│       (必填跳过原因)             │                               │
+└─────────────────────────────────┘                               │
+     │                                                            │
+     └──────────────[取消跳过]─────────> todo ────────────────────┘
 ```
+
+**跳过原因 (必填)：**
+- 图片损坏/无法加载
+- 图片模糊/质量差
+- 内容不符合标注要求
+- 其他 (需填写说明)
 
 ---
 
@@ -493,18 +806,116 @@ Image Status:
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-### 8.2 技术选型
+### 8.2 技术选型 (已锁定)
 
 | 层级 | 技术 | 理由 |
 |------|------|------|
 | **前端框架** | React 18 + TypeScript | 生态成熟；Hooks；并发特性 |
-| **状态管理** | Zustand + React Query | 轻量；服务端状态分离 |
-| **UI 组件** | Ant Design / Radix UI | 组件丰富；可定制 |
-| **画布引擎** | Fabric.js / Konva | 成熟的 Canvas 封装；交互支持好 |
+| **状态管理** | Zustand + TanStack Query (React Query) | 轻量；服务端状态分离；缓存管理 |
+| **UI 组件** | **Tailwind CSS + shadcn/ui** | 见下方选型说明 |
+| **画布引擎** | **Fabric.js** | 见下方选型说明 |
 | **后端框架** | FastAPI | 高性能；类型提示；自动文档 |
-| **ORM** | SQLAlchemy 2.0 | 异步支持；成熟稳定 |
+| **ORM** | SQLAlchemy 2.0 (async) | 异步支持；成熟稳定 |
 | **数据库** | PostgreSQL (生产) / SQLite (开发) | 可靠；JSON 支持好 |
-| **图片处理** | Pillow / libvips | 缩略图生成；格式转换 |
+| **图片处理** | Pillow + libvips (可选) | 缩略图生成；大图处理 |
+| **表达式引擎** | jmespath (Python) | Parser Template 核心依赖 |
+
+#### 8.2.1 UI 组件库选型：Tailwind + shadcn/ui
+
+**为什么不选 Ant Design：**
+- 包体积大 (~1MB gzip)，影响首屏加载
+- 样式定制需覆盖 Less 变量，与 Tailwind 生态不兼容
+- 设计风格偏"中后台"，标注工具需要更紧凑的 UI
+
+**为什么选 shadcn/ui：**
+- 基于 Radix UI 无样式原语，可访问性好
+- 代码复制到项目，完全可控，无运行时依赖
+- 与 Tailwind 无缝集成
+- 组件按需引入，Tree-shaking 友好
+- 社区活跃，更新快
+
+**迁移成本：** 从零开始，无迁移问题
+
+#### 8.2.2 画布引擎选型：Fabric.js
+
+**为什么选 Fabric.js (而非 Konva)：**
+- 对象模型更完整 (Group, ActiveSelection 等)
+- SVG 导入/导出支持好
+- 社区更大，文档更全
+- 内置序列化/反序列化 (`canvas.toJSON()` / `canvas.loadFromJSON()`)
+
+**Undo/Redo 实现方案：Command Pattern**
+
+```typescript
+// 命令接口
+interface Command {
+  execute(): void;
+  undo(): void;
+  redo(): void;
+}
+
+// 示例：添加矩形命令
+class AddRectCommand implements Command {
+  constructor(
+    private canvas: fabric.Canvas,
+    private rect: fabric.Rect,
+  ) {}
+
+  execute() {
+    this.canvas.add(this.rect);
+    this.canvas.setActiveObject(this.rect);
+  }
+
+  undo() {
+    this.canvas.remove(this.rect);
+  }
+
+  redo() {
+    this.execute();
+  }
+}
+
+// 历史管理器
+class HistoryManager {
+  private undoStack: Command[] = [];
+  private redoStack: Command[] = [];
+  private readonly maxSize = 50;
+
+  execute(cmd: Command) {
+    cmd.execute();
+    this.undoStack.push(cmd);
+    this.redoStack = []; // 清空 redo 栈
+    if (this.undoStack.length > this.maxSize) {
+      this.undoStack.shift();
+    }
+  }
+
+  undo() {
+    const cmd = this.undoStack.pop();
+    if (cmd) {
+      cmd.undo();
+      this.redoStack.push(cmd);
+    }
+  }
+
+  redo() {
+    const cmd = this.redoStack.pop();
+    if (cmd) {
+      cmd.redo();
+      this.undoStack.push(cmd);
+    }
+  }
+}
+```
+
+**支持的命令类型：**
+| 命令 | 触发操作 |
+|------|----------|
+| `AddObjectCommand` | 创建 bbox/polygon/分类标签 |
+| `RemoveObjectCommand` | 删除标注 |
+| `ModifyObjectCommand` | 移动、缩放、旋转 |
+| `ChangePropertyCommand` | 修改类别、属性 |
+| `BatchCommand` | 批量操作 (包装多个子命令) |
 
 ---
 
@@ -523,32 +934,49 @@ DELETE /api/v1/projects/{id}               # 删除项目
 # 数据集
 POST   /api/v1/projects/{id}/datasets      # 创建数据集
 GET    /api/v1/projects/{id}/datasets      # 数据集列表
-POST   /api/v1/datasets/{id}/import        # 导入图片
-POST   /api/v1/datasets/{id}/import-annotations  # 导入预标注
+POST   /api/v1/datasets/{id}/import        # 导入图片 (服务器路径)
+  # Body: { source_type: "local_path" | "s3", path: "/data/images", pattern: "*.jpg" }
+
+# Parser Template (预标注模板)
+POST   /api/v1/parser-templates            # 创建模板
+GET    /api/v1/parser-templates            # 模板列表 (含内置)
+GET    /api/v1/parser-templates/{id}       # 模板详情
+PUT    /api/v1/parser-templates/{id}       # 更新模板
+DELETE /api/v1/parser-templates/{id}       # 删除模板 (内置不可删)
+POST   /api/v1/parser-templates/test       # 测试解析 (返回前 20 条结果 + 错误)
+
+# 预标注导入
+POST   /api/v1/datasets/{id}/import-predictions  # 导入预标注
+  # Body: multipart/form-data { template_id, file, options: {conflict, score_threshold} }
+  # Response: { job_id } (异步)
+GET    /api/v1/jobs/{id}                   # 查询异步任务状态
 
 # 图片
-GET    /api/v1/datasets/{id}/images        # 图片列表 (分页+筛选)
+GET    /api/v1/datasets/{id}/images        # 图片列表 (分页+筛选+排序)
 GET    /api/v1/images/{id}                 # 图片详情+标注
-GET    /api/v1/images/{id}/thumbnail       # 缩略图
-GET    /api/v1/images/{id}/file            # 原图
+GET    /api/v1/images/{id}/thumbnail       # 缩略图 (支持 ETag/304)
+GET    /api/v1/images/{id}/medium          # 中图 800px (支持 ETag/304)
+GET    /api/v1/images/{id}/file            # 原图 (支持 Range/206)
 
-# 标注
-POST   /api/v1/images/{id}/annotations     # 创建/更新标注
-GET    /api/v1/images/{id}/annotations     # 获取标注
-PUT    /api/v1/annotations/{id}            # 更新单个标注
-DELETE /api/v1/annotations/{id}            # 删除标注
+# 标注 (支持乐观锁)
+GET    /api/v1/images/{id}/annotations     # 获取标注 (返回 ETag)
+PUT    /api/v1/images/{id}/annotations     # 更新标注 (需 If-Match)
+  # Headers: If-Match: "v3"
+  # Response: 200 OK | 412 Precondition Failed
+DELETE /api/v1/annotations/{id}            # 删除单个标注
 
 # 任务队列
 GET    /api/v1/datasets/{id}/next          # 获取下一个待标任务
-POST   /api/v1/images/{id}/skip            # 跳过
+POST   /api/v1/images/{id}/skip            # 跳过 (必填 reason)
 POST   /api/v1/images/{id}/submit          # 提交
 
-# 统计
+# 统计 (基于事件日志)
 GET    /api/v1/projects/{id}/stats         # 项目统计
 GET    /api/v1/projects/{id}/stats/daily   # 每日统计
+GET    /api/v1/projects/{id}/stats/annotators  # 标注员统计
 
 # 导出
-POST   /api/v1/projects/{id}/export        # 触发导出
+POST   /api/v1/projects/{id}/export        # 触发导出 (异步)
 GET    /api/v1/exports/{id}                # 下载导出文件
 ```
 
@@ -559,22 +987,35 @@ GET    /api/v1/exports/{id}                # 下载导出文件
 ### 10.1 版本路线图
 
 ```
-v1.0 MVP (当前)
+v1.0 MVP (当前) - P0 必做
 ├── 分类标注
 ├── 目标检测 (BBox)
 ├── 多边形分割 (Polygon)
-├── 预标注导入 (COCO/YOLO/VOC)
+├── Parser Template 系统 (任意 JSON/JSONL)
+│   ├── JMESPath 表达式引擎
+│   └── 内置 COCO/YOLO/VOC 模板
 ├── 快捷键系统
-├── Undo/Redo
-├── 进度显示 & 统计
-└── 慢网优化
+├── Undo/Redo (Command Pattern)
+├── 进度显示 & 统计 (事件日志)
+├── 慢网优化
+│   ├── 缩略图/中图/预取
+│   ├── HTTP 缓存 (ETag/304)
+│   ├── 乐观锁 (If-Match/412)
+│   └── 虚拟列表/骨架屏
+└── 服务器路径索引导入数据集
+
+v1.0 MVP (可选/降级)
+├── ZIP 文件上传导入
+├── Range/206 大文件断点
+├── 深色模式
+└── 亮度/对比度调整
 
 v1.1 (MVP+2个月)
 ├── Mask 画笔分割
 ├── 离线标注支持
 ├── 标注工具插件机制
 ├── 自定义属性字段
-├── 更多导出格式
+├── JSONPath (RFC 9535) 兼容
 └── 批量操作增强
 
 v2.0 (+6个月)
