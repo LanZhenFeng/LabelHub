@@ -50,6 +50,7 @@ import {
 } from '@/lib/api'
 import { AnnotationCanvas } from '@/components/AnnotationCanvas'
 import type { AnnotationData, BBoxData, PolygonData } from '@/lib/canvas/types'
+import { useImagePrefetch } from '@/hooks/use-image-prefetch'
 
 export default function CanvasAnnotatePage() {
   const { projectId, datasetId } = useParams<{ projectId: string; datasetId: string }>()
@@ -89,6 +90,28 @@ export default function CanvasAnnotatePage() {
     queryKey: ['annotations', item?.id],
     queryFn: () => annotationsApi.getItemAnnotations(item!.id),
     enabled: !!item?.id,
+  })
+
+  // 获取后续待标注项目用于预取
+  const { data: upcomingItems } = useQuery({
+    queryKey: ['upcomingItems', datasetId],
+    queryFn: () => itemsApi.list(Number(datasetId), { status: 'todo', page: 1, page_size: 5 }),
+    enabled: !!datasetId,
+  })
+
+  // 计算后续图片 URL（排除当前图片）
+  const upcomingImageUrls = useMemo(() => {
+    if (!upcomingItems?.items || !item) return []
+    return upcomingItems.items
+      .filter((upcomingItem) => upcomingItem.id !== item.id)
+      .map((upcomingItem) => upcomingItem.image_url)
+      .slice(0, 3) // 只取前3张
+  }, [upcomingItems, item])
+
+  // 启用图片预取
+  useImagePrefetch(item?.image_url, upcomingImageUrls, {
+    prefetchCount: 3,
+    bandwidthAware: true,
   })
 
   // Convert API annotations to canvas format

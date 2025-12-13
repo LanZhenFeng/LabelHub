@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import {
   ArrowLeft,
   Grid3X3,
@@ -40,6 +41,7 @@ export default function DatasetPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [page, setPage] = useState(1)
+  const parentRef = useRef<HTMLDivElement>(null)
 
   const { data: project } = useQuery({
     queryKey: ['project', projectId],
@@ -53,15 +55,28 @@ export default function DatasetPage() {
     enabled: !!datasetId,
   })
 
+  // 增加 page_size 以支持虚拟列表
   const { data: itemsData, isLoading: itemsLoading } = useQuery({
     queryKey: ['items', datasetId, statusFilter, page],
     queryFn: () =>
       itemsApi.list(Number(datasetId), {
         status: statusFilter === 'all' ? undefined : statusFilter,
         page,
-        page_size: 50,
+        page_size: 200, // 增加单页大小以配合虚拟滚动
       }),
     enabled: !!datasetId,
+  })
+
+  // 虚拟列表配置
+  const items = itemsData?.items || []
+  const columnCount = viewMode === 'grid' ? 6 : 1
+  const rowCount = Math.ceil(items.length / columnCount)
+
+  const rowVirtualizer = useVirtualizer({
+    count: rowCount,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => (viewMode === 'grid' ? 180 : 70), // grid: 图片高度, list: 行高
+    overscan: 3, // 预渲染行数
   })
 
   const scanMutation = useMutation({
@@ -183,14 +198,14 @@ export default function DatasetPage() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto p-6">
+      <div ref={parentRef} className="flex-1 overflow-auto p-6">
         {itemsLoading ? (
           <div className={cn('grid gap-4', viewMode === 'grid' ? 'grid-cols-6' : 'grid-cols-1')}>
             {Array.from({ length: 12 }).map((_, i) => (
               <Skeleton key={i} className={viewMode === 'grid' ? 'aspect-square' : 'h-16'} />
             ))}
           </div>
-        ) : itemsData?.items.length === 0 ? (
+        ) : items.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-center">
             <ImageIcon className="w-16 h-16 text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium mb-2">No images found</h3>
@@ -206,17 +221,46 @@ export default function DatasetPage() {
               </Button>
             )}
           </div>
-        ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {itemsData?.items.map((item) => (
-              <ImageCard key={item.id} item={item} />
-            ))}
-          </div>
         ) : (
-          <div className="space-y-2">
-            {itemsData?.items.map((item) => (
-              <ImageRow key={item.id} item={item} />
-            ))}
+          <div
+            style={{
+              height: `${rowVirtualizer.getTotalSize()}px`,
+              width: '100%',
+              position: 'relative',
+            }}
+          >
+            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+              const startIndex = virtualRow.index * columnCount
+              const rowItems = items.slice(startIndex, startIndex + columnCount)
+
+              return (
+                <div
+                  key={virtualRow.key}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: `${virtualRow.size}px`,
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                >
+                  {viewMode === 'grid' ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                      {rowItems.map((item) => (
+                        <ImageCard key={item.id} item={item} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {rowItems.map((item) => (
+                        <ImageRow key={item.id} item={item} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
 
