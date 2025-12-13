@@ -37,6 +37,10 @@ interface TooltipPayloadEntry {
   fill?: string
   name: string
   value: number
+  payload?: {
+    fill?: string
+    [key: string]: unknown
+  }
 }
 
 interface CustomTooltipProps {
@@ -150,7 +154,7 @@ export default function DashboardPage() {
       return (
         <div className="bg-popover/95 border text-popover-foreground shadow-lg rounded-lg p-3 text-sm backdrop-blur-sm min-w-[140px] animate-in fade-in zoom-in-95 duration-200">
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: data.payload.fill || data.color }} />
+            <div className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: data.payload?.fill || data.color }} />
             <span className="font-semibold">{data.name}</span>
           </div>
           <div className="flex items-baseline gap-2">
