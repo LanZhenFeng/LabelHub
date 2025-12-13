@@ -62,8 +62,6 @@ export default function CanvasAnnotatePage() {
   const [currentAnnotations, setCurrentAnnotations] = useState<AnnotationData[]>([])
   const [isDirty, setIsDirty] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
-  const [itemHistory, setItemHistory] = useState<number[]>([]) // Stack of previous item IDs
-  const [currentItemId, setCurrentItemId] = useState<number | null>(null)
 
   // Fetch project for labels
   const { data: project } = useQuery({
@@ -157,16 +155,6 @@ export default function CanvasAnnotatePage() {
     },
   })
 
-  // Track item history for "previous" navigation
-  useEffect(() => {
-    if (item && item.id !== currentItemId) {
-      if (currentItemId !== null) {
-        setItemHistory(prev => [...prev, currentItemId])
-      }
-      setCurrentItemId(item.id)
-    }
-  }, [item, currentItemId])
-
   // Submit mutation
   const submitMutation = useMutation({
     mutationFn: async () => {
@@ -226,37 +214,17 @@ export default function CanvasAnnotatePage() {
     setIsDirty(true)
   }, [])
 
-  // Go to previous item
+  // Go to previous item (using server API - by dataset item order)
   const goToPreviousItem = useCallback(async () => {
     if (!item) return
     
-    // Try client history first, then fallback to server API
-    let prevItemId: number | null = null
-    
-    if (itemHistory.length > 0) {
-      // Use client history
-      prevItemId = itemHistory[itemHistory.length - 1]
-      setItemHistory(prev => prev.slice(0, -1))
-    } else {
-      // Try to get previous from server
-      try {
-        const prevItem = await itemsApi.getPrevious(item.id)
-        if (!prevItem) {
-          toast({ title: 'No previous item', description: 'This is the first item' })
-          return
-        }
-        prevItemId = prevItem.id
-      } catch {
+    try {
+      const prevItem = await itemsApi.getPrevious(item.id)
+      if (!prevItem) {
         toast({ title: 'No previous item', description: 'This is the first item' })
         return
       }
-    }
-    
-    setCurrentItemId(prevItemId)
-    
-    // Fetch the previous item
-    try {
-      const prevItem = await itemsApi.get(prevItemId)
+      
       queryClient.setQueryData(['nextItem', datasetId], (old: typeof nextItemData) => ({
         ...old,
         item: prevItem,
@@ -264,9 +232,9 @@ export default function CanvasAnnotatePage() {
       setCurrentAnnotations([])
       setIsDirty(false)
     } catch {
-      toast({ title: 'Error', description: 'Failed to load previous item', variant: 'destructive' })
+      toast({ title: 'No previous item', description: 'This is the first item' })
     }
-  }, [item, itemHistory, datasetId, queryClient, nextItemData, toast])
+  }, [item, datasetId, queryClient, nextItemData, toast])
 
   // Handle right-click to submit
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
@@ -312,18 +280,15 @@ export default function CanvasAnnotatePage() {
           }
           break
         case 'ArrowLeft':
-        case 'Escape':
-          if (e.key === 'ArrowLeft' || (e.key === 'Escape' && itemHistory.length > 0)) {
-            e.preventDefault()
-            goToPreviousItem()
-          }
+          e.preventDefault()
+          goToPreviousItem()
           break
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [currentAnnotations, submitMutation, saveMutation, itemHistory, goToPreviousItem])
+  }, [currentAnnotations, submitMutation, saveMutation, goToPreviousItem])
 
   const progress = nextItemData
     ? (nextItemData.done_count / Math.max(nextItemData.total_count, 1)) * 100

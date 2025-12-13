@@ -49,8 +49,7 @@ export default function AnnotatePage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [skipReason, setSkipReason] = useState('')
   const [imageLoaded, setImageLoaded] = useState(false)
-  const [itemHistory, setItemHistory] = useState<number[]>([])
-  const [currentItemId, setCurrentItemId] = useState<number | null>(null)
+  const [imageZoom, setImageZoom] = useState(1)
 
   // Fetch project for labels
   const { data: project } = useQuery({
@@ -114,56 +113,48 @@ export default function AnnotatePage() {
     },
   })
 
-  // Track item history for "previous" navigation
-  useEffect(() => {
-    if (item && item.id !== currentItemId) {
-      if (currentItemId !== null) {
-        setItemHistory(prev => [...prev, currentItemId])
-      }
-      setCurrentItemId(item.id)
-    }
-  }, [item, currentItemId])
-
-  // Go to previous item
+  // Go to previous item (using server API - by dataset item order)
   const goToPreviousItem = useCallback(async () => {
     if (!item) return
     
-    // Try client history first, then fallback to server API
-    let prevItemId: number | null = null
-    
-    if (itemHistory.length > 0) {
-      // Use client history
-      prevItemId = itemHistory[itemHistory.length - 1]
-      setItemHistory(prev => prev.slice(0, -1))
-    } else {
-      // Try to get previous from server
-      try {
-        const prevItem = await itemsApi.getPrevious(item.id)
-        if (!prevItem) {
-          toast({ title: 'No previous item', description: 'This is the first item' })
-          return
-        }
-        prevItemId = prevItem.id
-      } catch {
+    try {
+      const prevItem = await itemsApi.getPrevious(item.id)
+      if (!prevItem) {
         toast({ title: 'No previous item', description: 'This is the first item' })
         return
       }
-    }
-    
-    setCurrentItemId(prevItemId)
-    
-    try {
-      const prevItem = await itemsApi.get(prevItemId)
+      
       queryClient.setQueryData(['nextItem', datasetId], (old: typeof nextItemData) => ({
         ...old,
         item: prevItem,
       }))
       setSelectedLabel(null)
       setImageLoaded(false)
+      setImageZoom(1)
     } catch {
-      toast({ title: 'Error', description: 'Failed to load previous item', variant: 'destructive' })
+      toast({ title: 'No previous item', description: 'This is the first item' })
     }
-  }, [item, itemHistory, datasetId, queryClient, nextItemData, toast])
+  }, [item, datasetId, queryClient, nextItemData, toast])
+
+  // Go to next item (without submitting - just navigate)
+  const goToNextItem = useCallback(async () => {
+    if (!item) return
+    
+    try {
+      // Get next item by ID order
+      const response = await itemsApi.getNext(Number(datasetId))
+      if (response.item && response.item.id !== item.id) {
+        queryClient.setQueryData(['nextItem', datasetId], response)
+        setSelectedLabel(null)
+        setImageLoaded(false)
+        setImageZoom(1)
+      } else {
+        toast({ title: 'No next item', description: 'This is the last item or all done' })
+      }
+    } catch {
+      toast({ title: 'Error', description: 'Failed to load next item', variant: 'destructive' })
+    }
+  }, [item, datasetId, queryClient, toast])
 
   // Handle label selection
   const handleSelectLabel = useCallback(
@@ -229,12 +220,29 @@ export default function AnnotatePage() {
           e.preventDefault()
           goToPreviousItem()
           break
+        case 'ArrowRight':
+          e.preventDefault()
+          goToNextItem()
+          break
+        case '+':
+        case '=':
+          e.preventDefault()
+          setImageZoom(z => Math.min(z * 1.2, 5))
+          break
+        case '-':
+          e.preventDefault()
+          setImageZoom(z => Math.max(z / 1.2, 0.5))
+          break
+        case '0':
+          e.preventDefault()
+          setImageZoom(1)
+          break
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [labels, handleSelectLabel, handleSubmit, handleNext, goToPreviousItem])
+  }, [labels, handleSelectLabel, handleSubmit, handleNext, goToPreviousItem, goToNextItem])
 
   // Pre-select label if item already has one
   useEffect(() => {
@@ -287,16 +295,25 @@ export default function AnnotatePage() {
           </Button>
         </Link>
 
-        {/* Previous button */}
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={goToPreviousItem}
-          disabled={false}
-          title="Previous (←)"
-        >
-          <ChevronLeft className="w-4 h-4" />
-        </Button>
+        {/* Navigation buttons */}
+        <div className="flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={goToPreviousItem}
+            title="Previous (←)"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={goToNextItem}
+            title="Next (→)"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        </div>
 
         <div className="flex-1">
           <div className="flex items-center gap-4">
@@ -318,11 +335,21 @@ export default function AnnotatePage() {
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Image area */}
-        <div className="flex-1 flex items-center justify-center p-8 bg-black/5">
+        <div 
+          className="flex-1 flex items-center justify-center p-8 bg-black/5 overflow-auto"
+          onWheel={(e) => {
+            e.preventDefault()
+            const delta = e.deltaY
+            setImageZoom(z => {
+              const newZoom = z * (delta > 0 ? 0.9 : 1.1)
+              return Math.min(Math.max(newZoom, 0.5), 5)
+            })
+          }}
+        >
           {nextItemLoading ? (
             <Skeleton className="w-full max-w-3xl aspect-video" />
           ) : item ? (
-            <div className="relative max-w-full max-h-full">
+            <div className="relative flex items-center justify-center">
               {!imageLoaded && (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
@@ -332,12 +359,18 @@ export default function AnnotatePage() {
                 key={item.id}
                 src={item.image_url}
                 alt={item.filename}
+                style={{ transform: `scale(${imageZoom})` }}
                 className={cn(
-                  'max-w-full max-h-[calc(100vh-200px)] object-contain rounded-lg shadow-lg transition-opacity',
+                  'max-w-full max-h-[calc(100vh-200px)] object-contain rounded-lg shadow-lg transition-all',
                   imageLoaded ? 'opacity-100' : 'opacity-0'
                 )}
                 onLoad={() => setImageLoaded(true)}
               />
+              {imageZoom !== 1 && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 text-white px-3 py-1 rounded-full text-sm">
+                  {Math.round(imageZoom * 100)}%
+                </div>
+              )}
             </div>
           ) : null}
         </div>
