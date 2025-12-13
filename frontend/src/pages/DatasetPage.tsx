@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useVirtualizer } from '@tanstack/react-virtual'
@@ -42,7 +42,6 @@ export default function DatasetPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [page, setPage] = useState(1)
   const parentRef = useRef<HTMLDivElement>(null)
-  const [useVirtual, setUseVirtual] = useState(false)
 
   const { data: project } = useQuery({
     queryKey: ['project', projectId],
@@ -56,38 +55,48 @@ export default function DatasetPage() {
     enabled: !!datasetId,
   })
 
-  // 每页100张图片，平衡加载速度和分页次数
+  // 每页100张图片，支持虚拟滚动优化
   const { data: itemsData, isLoading: itemsLoading } = useQuery({
     queryKey: ['items', datasetId, statusFilter, page],
     queryFn: () =>
       itemsApi.list(Number(datasetId), {
         status: statusFilter === 'all' ? undefined : statusFilter,
         page,
-        page_size: 100, // 增加到100张以减少分页操作
+        page_size: 100,
       }),
     enabled: !!datasetId,
   })
 
-  // 决定是否使用虚拟列表（超过50张就启用）
-  useEffect(() => {
-    if (itemsData && itemsData.items.length > 50) {
-      setUseVirtual(true)
-    } else {
-      setUseVirtual(false)
-    }
-  }, [itemsData])
-
-  // 虚拟列表配置（仅在数据量大时使用）
   const items = itemsData?.items || []
-  const columnCount = viewMode === 'grid' ? 6 : 1
+  
+  // 虚拟列表配置 - 按行虚拟化
+  // 根据视图模式确定列数（使用固定列数避免响应式问题）
+  const getColumnCount = () => {
+    if (viewMode === 'list') return 1
+    // Grid模式：使用固定6列，简化高度计算
+    return 6
+  }
+  
+  const columnCount = getColumnCount()
   const rowCount = Math.ceil(items.length / columnCount)
+
+  // 动态计算行高：宁可高估也不重叠
+  const getRowHeight = () => {
+    if (viewMode === 'list') {
+      return 88 // list模式：固定高度
+    }
+    // Grid模式：图片是aspect-square，按容器宽度计算
+    // 假设容器宽度约1200px，6列，gap-4(16px)
+    // 每列宽度 ≈ (1200 - 5*16) / 6 ≈ 186px
+    // 加上gap约202px，为安全起见用250px
+    return 250
+  }
 
   const rowVirtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => (viewMode === 'grid' ? 200 : 88), // grid: 图片+gap, list: 行高+gap
-    overscan: 5, // 预渲染行数
-    enabled: useVirtual,
+    estimateSize: getRowHeight,
+    overscan: 2,
   })
 
   const scanMutation = useMutation({
@@ -208,33 +217,33 @@ export default function DatasetPage() {
         </div>
       </div>
 
-      {/* Content */}
-      <div ref={parentRef} className="flex-1 overflow-auto p-6">
-        {itemsLoading ? (
-          <div className={cn('grid gap-4', viewMode === 'grid' ? 'grid-cols-6' : 'grid-cols-1')}>
-            {Array.from({ length: 12 }).map((_, i) => (
-              <Skeleton key={i} className={viewMode === 'grid' ? 'aspect-square' : 'h-16'} />
-            ))}
-          </div>
-        ) : items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-center">
-            <ImageIcon className="w-16 h-16 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">No images found</h3>
-            <p className="text-muted-foreground mb-4">
-              {statusFilter === 'all'
-                ? 'Scan the dataset to import images'
-                : `No ${statusFilter} images in this dataset`}
-            </p>
-            {statusFilter === 'all' && (
-              <Button onClick={() => scanMutation.mutate()}>
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Scan Now
-              </Button>
-            )}
-          </div>
-        ) : useVirtual ? (
-          // 虚拟列表模式（大量数据）
-          <>
+      {/* Content - 分离滚动区域和分页 */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <div ref={parentRef} className="flex-1 overflow-auto p-6">
+          {itemsLoading ? (
+            <div className={cn('grid gap-4', viewMode === 'grid' ? 'grid-cols-6' : 'grid-cols-1')}>
+              {Array.from({ length: 12 }).map((_, i) => (
+                <Skeleton key={i} className={viewMode === 'grid' ? 'aspect-square' : 'h-16'} />
+              ))}
+            </div>
+          ) : items.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-64 text-center">
+              <ImageIcon className="w-16 h-16 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium mb-2">No images found</h3>
+              <p className="text-muted-foreground mb-4">
+                {statusFilter === 'all'
+                  ? 'Scan the dataset to import images'
+                  : `No ${statusFilter} images in this dataset`}
+              </p>
+              {statusFilter === 'all' && (
+                <Button onClick={() => scanMutation.mutate()}>
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Scan Now
+                </Button>
+              )}
+            </div>
+          ) : (
+            // 虚拟列表渲染
             <div
               style={{
                 height: `${rowVirtualizer.getTotalSize()}px`,
@@ -249,17 +258,18 @@ export default function DatasetPage() {
                 return (
                   <div
                     key={virtualRow.key}
+                    data-index={virtualRow.index}
                     style={{
                       position: 'absolute',
                       top: 0,
                       left: 0,
                       width: '100%',
-                      height: `${virtualRow.size}px`,
                       transform: `translateY(${virtualRow.start}px)`,
+                      paddingBottom: viewMode === 'grid' ? '16px' : '8px', // 添加底部间距避免重叠
                     }}
                   >
                     {viewMode === 'grid' ? (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                      <div className="grid grid-cols-6 gap-4">
                         {rowItems.map((item) => (
                           <ImageCard key={item.id} item={item} />
                         ))}
@@ -275,74 +285,34 @@ export default function DatasetPage() {
                 )
               })}
             </div>
-            
-            {/* Pagination - 虚拟列表模式 */}
-            {itemsData && itemsData.total_pages > 1 && (
-              <div className="flex items-center justify-center gap-2 mt-6">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                >
-                  Previous
-                </Button>
-                <span className="text-sm text-muted-foreground">
-                  Page {page} of {itemsData.total_pages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.min(itemsData.total_pages, p + 1))}
-                  disabled={page === itemsData.total_pages}
-                >
-                  Next
-                </Button>
-              </div>
-            )}
-          </>
-        ) : (
-          // 常规模式（少量数据）
-          <>
-            {viewMode === 'grid' ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                {items.map((item) => (
-                  <ImageCard key={item.id} item={item} />
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {items.map((item) => (
-                  <ImageRow key={item.id} item={item} />
-                ))}
-              </div>
-            )}
-            
-            {/* Pagination - 常规模式 */}
-            {itemsData && itemsData.total_pages > 1 && (
-              <div className="flex items-center justify-center gap-2 mt-6">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                >
-                  Previous
-                </Button>
-                <span className="text-sm text-muted-foreground">
-                  Page {page} of {itemsData.total_pages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.min(itemsData.total_pages, p + 1))}
-                  disabled={page === itemsData.total_pages}
-                >
-                  Next
-                </Button>
-              </div>
-            )}
-          </>
+          )}
+        </div>
+
+        {/* Pagination - 固定在底部，不在滚动区域内 */}
+        {itemsData && itemsData.total_pages > 1 && (
+          <div className="border-t bg-card px-6 py-3">
+            <div className="flex items-center justify-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+              >
+                Previous
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Page {page} of {itemsData.total_pages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.min(itemsData.total_pages, p + 1))}
+                disabled={page === itemsData.total_pages}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
         )}
       </div>
     </div>
