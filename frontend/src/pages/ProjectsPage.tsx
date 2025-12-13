@@ -177,12 +177,8 @@ export default function ProjectsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="classification">Classification</SelectItem>
-                    <SelectItem value="detection" disabled>
-                      Detection (M1)
-                    </SelectItem>
-                    <SelectItem value="segmentation" disabled>
-                      Segmentation (M1)
-                    </SelectItem>
+                    <SelectItem value="detection">Detection</SelectItem>
+                    <SelectItem value="segmentation">Segmentation</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
