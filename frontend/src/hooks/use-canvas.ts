@@ -10,7 +10,6 @@ import {
   HistoryManager,
   AddAnnotationCommand,
   RemoveAnnotationCommand,
-  ModifyAnnotationCommand,
   ChangeLabelCommand,
 } from '@/lib/canvas/commands'
 
@@ -103,24 +102,12 @@ export function useCanvas(options: UseCanvasOptions = {}) {
     // Cleanup previous canvas
     if (canvasRef.current) {
       canvasRef.current.dispose()
+      canvasRef.current = null
     }
 
     containerRef.current = container
 
-    // Create canvas element
-    const canvasEl = document.createElement('canvas')
-    canvasEl.id = 'annotation-canvas'
-    container.innerHTML = ''
-    container.appendChild(canvasEl)
-
-    // Create Fabric canvas
-    const canvas = new FabricCanvas(canvasEl, {
-      selection: true,
-      preserveObjectStacking: true,
-    })
-    canvasRef.current = canvas
-
-    // Load image
+    // Load image first to get dimensions
     const img = new Image()
     img.crossOrigin = 'anonymous'
     img.onload = () => {
@@ -132,13 +119,27 @@ export function useCanvas(options: UseCanvasOptions = {}) {
       const scaleY = containerHeight / img.height
       const scale = Math.min(scaleX, scaleY, 1) // Don't scale up
 
-      const canvasWidth = img.width * scale
-      const canvasHeight = img.height * scale
+      const canvasWidth = Math.floor(img.width * scale)
+      const canvasHeight = Math.floor(img.height * scale)
 
-      canvas.setWidth(canvasWidth)
-      canvas.setHeight(canvasHeight)
+      // Create canvas element with correct dimensions
+      const canvasEl = document.createElement('canvas')
+      canvasEl.id = 'annotation-canvas'
+      canvasEl.width = canvasWidth
+      canvasEl.height = canvasHeight
+      container.innerHTML = ''
+      container.appendChild(canvasEl)
 
-      // Set background image
+      // Create Fabric canvas with dimensions
+      const canvas = new FabricCanvas(canvasEl, {
+        width: canvasWidth,
+        height: canvasHeight,
+        selection: true,
+        preserveObjectStacking: true,
+      })
+      canvasRef.current = canvas
+
+      // Set background image using FabricImage
       FabricImage.fromURL(imageUrl, { crossOrigin: 'anonymous' }).then((fabricImg) => {
         fabricImg.scaleX = scale
         fabricImg.scaleY = scale
@@ -149,72 +150,28 @@ export function useCanvas(options: UseCanvasOptions = {}) {
       })
 
       setZoom(scale)
+
+      // Event handlers
+      canvas.on('selection:created', (e) => {
+        const selected = e.selected?.[0]
+        if (selected?.annotationId) {
+          setSelectedAnnotationId(selected.annotationId)
+        }
+      })
+
+      canvas.on('selection:updated', (e) => {
+        const selected = e.selected?.[0]
+        if (selected?.annotationId) {
+          setSelectedAnnotationId(selected.annotationId)
+        }
+      })
+
+      canvas.on('selection:cleared', () => {
+        setSelectedAnnotationId(null)
+      })
     }
     img.src = imageUrl
-
-    // Event handlers
-    canvas.on('selection:created', (e) => {
-      const selected = e.selected?.[0]
-      if (selected?.annotationId) {
-        setSelectedAnnotationId(selected.annotationId)
-      }
-    })
-
-    canvas.on('selection:updated', (e) => {
-      const selected = e.selected?.[0]
-      if (selected?.annotationId) {
-        setSelectedAnnotationId(selected.annotationId)
-      }
-    })
-
-    canvas.on('selection:cleared', () => {
-      setSelectedAnnotationId(null)
-    })
-
-    canvas.on('object:modified', (e) => {
-      const obj = e.target
-      if (!obj?.annotationId) return
-
-      const annotation = annotations.find(a => a.id === obj.annotationId)
-      if (!annotation) return
-
-      if (obj instanceof Rect && annotation.type === 'bbox') {
-        const scaleX = obj.scaleX || 1
-        const scaleY = obj.scaleY || 1
-        const newData: Partial<BBoxData> = {
-          x: obj.left || 0,
-          y: obj.top || 0,
-          width: (obj.width || 0) * scaleX,
-          height: (obj.height || 0) * scaleY,
-        }
-
-        // Reset scale
-        obj.set({ scaleX: 1, scaleY: 1 })
-        obj.setCoords()
-
-        const cmd = new ModifyAnnotationCommand(
-          obj.annotationId,
-          { x: annotation.x, y: annotation.y, width: annotation.width, height: annotation.height },
-          newData,
-          updateAnnotation
-        )
-        historyRef.current.execute(cmd)
-        updateHistoryState()
-      } else if (obj instanceof Polygon && annotation.type === 'polygon') {
-        const points = (obj.points || []).map(p => [p.x, p.y])
-        const cmd = new ModifyAnnotationCommand(
-          obj.annotationId,
-          { points: annotation.points },
-          { points },
-          updateAnnotation
-        )
-        historyRef.current.execute(cmd)
-        updateHistoryState()
-      }
-    })
-
-    return canvas
-  }, [annotations, updateAnnotation, setSelectedAnnotationId, updateHistoryState])
+  }, [setSelectedAnnotationId])
 
   // Set tool
   const setTool = useCallback((newTool: CanvasTool) => {
