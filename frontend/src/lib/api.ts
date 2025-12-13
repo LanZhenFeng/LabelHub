@@ -342,5 +342,224 @@ export const statsApi = {
       .then((r) => r.data),
 }
 
+// ============= M4: Authentication API =============
+export interface User {
+  id: number
+  username: string
+  email: string
+  role: 'admin' | 'annotator' | 'reviewer'
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface LoginRequest {
+  username: string
+  password: string
+}
+
+export interface LoginResponse {
+  access_token: string
+  refresh_token: string
+  token_type: string
+  user: User
+}
+
+export interface RegisterRequest {
+  username: string
+  email: string
+  password: string
+}
+
+export interface RegisterResponse {
+  user: User
+  access_token: string
+  refresh_token: string
+  token_type: string
+}
+
+export interface RefreshTokenRequest {
+  refresh_token: string
+}
+
+export interface RefreshTokenResponse {
+  access_token: string
+  token_type: string
+}
+
+export interface UpdatePasswordRequest {
+  old_password: string
+  new_password: string
+}
+
+export const authApi = {
+  register: (data: RegisterRequest) =>
+    api.post<RegisterResponse>('/auth/register', data).then((r) => r.data),
+  
+  login: (data: LoginRequest) => {
+    // OAuth2 Password Flow requires form data
+    const formData = new URLSearchParams()
+    formData.append('username', data.username)
+    formData.append('password', data.password)
+    
+    return api
+      .post<LoginResponse>('/auth/login', formData, {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      })
+      .then((r) => r.data)
+  },
+
+  refresh: (refreshToken: string) =>
+    api
+      .post<RefreshTokenResponse>('/auth/refresh', { refresh_token: refreshToken })
+      .then((r) => r.data),
+
+  me: () => api.get<User>('/auth/me').then((r) => r.data),
+
+  updatePassword: (data: UpdatePasswordRequest) =>
+    api.put<{ message: string }>('/auth/me/password', data).then((r) => r.data),
+
+  logout: () => api.post<{ message: string }>('/auth/logout').then((r) => r.data),
+}
+
+// User Management API (Admin only)
+export interface UserCreateRequest {
+  username: string
+  email: string
+  password: string
+}
+
+export interface UserUpdateRequest {
+  email?: string
+  is_active?: boolean
+}
+
+export interface UserUpdateRoleRequest {
+  role: 'admin' | 'annotator' | 'reviewer'
+}
+
+export interface UsersListResponse {
+  items: User[]
+  total: number
+  page: number
+  limit: number
+  pages: number
+}
+
+export const usersApi = {
+  list: (params?: { page?: number; limit?: number; role?: string; is_active?: boolean }) =>
+    api.get<UsersListResponse>('/users', { params }).then((r) => r.data),
+
+  create: (data: UserCreateRequest) =>
+    api.post<User>('/users', data).then((r) => r.data),
+
+  get: (id: number) => api.get<User>(`/users/${id}`).then((r) => r.data),
+
+  update: (id: number, data: UserUpdateRequest) =>
+    api.put<User>(`/users/${id}`, data).then((r) => r.data),
+
+  updateRole: (id: number, role: string) =>
+    api.put<User>(`/users/${id}/role`, { role }).then((r) => r.data),
+
+  delete: (id: number) => api.delete(`/users/${id}`),
+}
+
+// ============= Axios Interceptors for JWT =============
+// Note: This will be configured in main.tsx after userStore is available
+
+export function setupAuthInterceptors(
+  getAccessToken: () => string | null,
+  getRefreshToken: () => string | null,
+  setTokens: (access: string, refresh: string) => void,
+  clearAuth: () => void
+) {
+  // Request interceptor: Add JWT token to headers
+  api.interceptors.request.use(
+    (config) => {
+      const token = getAccessToken()
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`
+      }
+      return config
+    },
+    (error) => Promise.reject(error)
+  )
+
+  // Response interceptor: Handle 401 and auto-refresh token
+  let isRefreshing = false
+  let failedQueue: Array<{
+    resolve: (value?: unknown) => void
+    reject: (reason?: unknown) => void
+  }> = []
+
+  const processQueue = (error: unknown = null) => {
+    failedQueue.forEach((prom) => {
+      if (error) {
+        prom.reject(error)
+      } else {
+        prom.resolve()
+      }
+    })
+    failedQueue = []
+  }
+
+  api.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+      const originalRequest = error.config
+
+      // If error is not 401 or already retried, reject
+      if (error.response?.status !== 401 || originalRequest._retry) {
+        return Promise.reject(error)
+      }
+
+      // If currently refreshing, queue the request
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject })
+        })
+          .then(() => api(originalRequest))
+          .catch((err) => Promise.reject(err))
+      }
+
+      originalRequest._retry = true
+      isRefreshing = true
+
+      const refreshToken = getRefreshToken()
+
+      if (!refreshToken) {
+        // No refresh token, clear auth and redirect to login
+        clearAuth()
+        window.location.href = '/login'
+        return Promise.reject(error)
+      }
+
+      try {
+        // Try to refresh the token
+        const { access_token } = await authApi.refresh(refreshToken)
+        setTokens(access_token, refreshToken)
+
+        // Update the failed request's auth header
+        originalRequest.headers.Authorization = `Bearer ${access_token}`
+
+        // Process queued requests
+        processQueue()
+        isRefreshing = false
+
+        // Retry the original request
+        return api(originalRequest)
+      } catch (refreshError) {
+        // Refresh failed, clear auth and redirect to login
+        processQueue(refreshError)
+        clearAuth()
+        window.location.href = '/login'
+        isRefreshing = false
+        return Promise.reject(refreshError)
+      }
+    }
+  )
+}
+
 export default api
+
 
