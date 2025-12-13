@@ -1,9 +1,17 @@
 """Pydantic schemas for API request/response validation."""
 
 from app.schemas.annotation import (
+    BatchAnnotationsCreate,
+    BBoxCreate,
+    BBoxResponse,
+    BBoxUpdate,
     ClassificationCreate,
     ClassificationResponse,
     EventResponse,
+    ItemAnnotationsResponse,
+    PolygonCreate,
+    PolygonResponse,
+    PolygonUpdate,
     SkipRequest,
 )
 from app.schemas.dataset import DatasetCreate, DatasetResponse, ScanRequest, ScanResponse
@@ -28,5 +36,14 @@ __all__ = [
     "ClassificationResponse",
     "SkipRequest",
     "EventResponse",
+    # M1: Detection & Segmentation
+    "BBoxCreate",
+    "BBoxUpdate",
+    "BBoxResponse",
+    "PolygonCreate",
+    "PolygonUpdate",
+    "PolygonResponse",
+    "BatchAnnotationsCreate",
+    "ItemAnnotationsResponse",
 ]
 

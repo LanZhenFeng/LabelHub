@@ -4,7 +4,7 @@ import enum
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, func
+from sqlalchemy import DateTime, Enum, Float, ForeignKey, Integer, String, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
@@ -13,6 +13,7 @@ from app.core.database import Base
 
 if TYPE_CHECKING:
     from app.models.item import Item
+    from app.models.label import Label
 
 
 class ClassificationAnnotation(Base):
@@ -99,4 +100,100 @@ class AnnotationEvent(Base):
 
     def __repr__(self) -> str:
         return f"<AnnotationEvent(id={self.id}, type={self.event_type}, item_id={self.item_id})>"
+
+
+class BBoxAnnotation(Base):
+    """Bounding box annotation for object detection."""
+
+    __tablename__ = "bbox_annotations"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    item_id: Mapped[int] = mapped_column(
+        ForeignKey("items.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    label_id: Mapped[int] = mapped_column(
+        ForeignKey("labels.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    # Bounding box coordinates (pixel values)
+    x: Mapped[float] = mapped_column(Float, nullable=False)
+    y: Mapped[float] = mapped_column(Float, nullable=False)
+    width: Mapped[float] = mapped_column(Float, nullable=False)
+    height: Mapped[float] = mapped_column(Float, nullable=False)
+    # Optional attributes
+    attributes: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"),
+        nullable=True,
+        comment="Additional attributes (occluded, truncated, etc.)",
+    )
+    user_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    # Relationships
+    item: Mapped["Item"] = relationship("Item", back_populates="bboxes")
+    label: Mapped["Label"] = relationship("Label")
+
+    def __repr__(self) -> str:
+        return f"<BBoxAnnotation(id={self.id}, label_id={self.label_id}, item_id={self.item_id})>"
+
+
+class PolygonAnnotation(Base):
+    """Polygon annotation for instance segmentation."""
+
+    __tablename__ = "polygon_annotations"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    item_id: Mapped[int] = mapped_column(
+        ForeignKey("items.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    label_id: Mapped[int] = mapped_column(
+        ForeignKey("labels.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    # Points stored as JSON array [[x1,y1], [x2,y2], ...]
+    points: Mapped[list[list[float]]] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"),
+        nullable=False,
+    )
+    # Optional attributes
+    attributes: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"),
+        nullable=True,
+        comment="Additional attributes (occluded, crowd, etc.)",
+    )
+    user_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    # Relationships
+    item: Mapped["Item"] = relationship("Item", back_populates="polygons")
+    label: Mapped["Label"] = relationship("Label")
+
+    def __repr__(self) -> str:
+        return f"<PolygonAnnotation(id={self.id}, label_id={self.label_id}, item_id={self.item_id})>"
 
