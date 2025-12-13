@@ -1,0 +1,106 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 16% 96%;
+    --foreground: 220 16% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 16% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 16% 10%;
+    --primary: 221 83% 53%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 14% 90%;
+    --secondary-foreground: 220 16% 15%;
+    --muted: 220 14% 92%;
+    --muted-foreground: 220 8% 46%;
+    --accent: 262 83% 58%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 13% 87%;
+    --input: 220 13% 87%;
+    --ring: 221 83% 53%;
+    --radius: 0.625rem;
+  }
+
+  .dark {
+    --background: 224 27% 10%;
+    --foreground: 220 13% 93%;
+    --card: 224 27% 13%;
+    --card-foreground: 220 13% 93%;
+    --popover: 224 27% 13%;
+    --popover-foreground: 220 13% 93%;
+    --primary: 221 83% 58%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 224 27% 18%;
+    --secondary-foreground: 220 13% 90%;
+    --muted: 224 27% 18%;
+    --muted-foreground: 220 8% 56%;
+    --accent: 262 83% 63%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 224 27% 20%;
+    --input: 224 27% 20%;
+    --ring: 221 83% 58%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Outfit', system-ui, sans-serif;
+  }
+  code, kbd, pre {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-muted/50;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/20 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/30;
+}
+
+/* Skeleton animation */
+.skeleton {
+  @apply relative overflow-hidden bg-muted;
+}
+
+.skeleton::after {
+  @apply absolute inset-0 -translate-x-full;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    hsl(var(--muted-foreground) / 0.1),
+    transparent
+  );
+  animation: shimmer 1.5s infinite;
+  content: '';
+}
+
+/* Keyboard shortcuts styling */
+kbd {
+  @apply inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-medium;
+  @apply bg-muted border border-border rounded shadow-sm;
+  min-width: 1.5rem;
+}
+

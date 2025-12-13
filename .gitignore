@@ -22,8 +22,8 @@ parts/
 sdist/
 develop-eggs/
 .installed.cfg
-lib/
-lib64/
+./lib/
+./lib64/
 pip-wheel-metadata/
 
 # Python tools cache
@@ -65,7 +65,13 @@ runs/
 artifacts/
 outputs/
 checkpoints/
-models/
+./models/
+
+# ----- LabelHub specific -----
+# SQLite database
+*.db
+# Generated thumbnails
+thumbs/
 
 # Large binary files
 *.zip
