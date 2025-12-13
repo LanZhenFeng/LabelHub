@@ -45,10 +45,12 @@ export function useCanvas(options: UseCanvasOptions = {}) {
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
   const [isDrawing, setIsDrawing] = useState(false)
+  const [isPanning, setIsPanning] = useState(false)
 
   // Drawing state refs (for polygon)
   const drawingPointsRef = useRef<number[][]>([])
   const tempPolygonRef = useRef<Polygon | null>(null)
+  const lastPanPointRef = useRef<{ x: number; y: number } | null>(null)
 
   // Update history state
   const updateHistoryState = useCallback(() => {
@@ -65,10 +67,54 @@ export function useCanvas(options: UseCanvasOptions = {}) {
     }
   }, [annotations, onAnnotationsChange])
 
-  // Annotation operations
+  // Annotation operations - these need to sync both state AND canvas
   const addAnnotation = useCallback((annotation: AnnotationData) => {
     setAnnotations(prev => [...prev, annotation])
-  }, [])
+    // Also add to canvas if not already there
+    const canvas = canvasRef.current
+    if (canvas) {
+      const existing = canvas.getObjects().find(o => o.annotationId === annotation.id)
+      if (!existing) {
+        // Need to add to canvas - use a default color if not specified
+        const color = annotation.labelColor || selectedLabelColor || '#ff0000'
+        if (annotation.type === 'bbox') {
+          const data = annotation as BBoxData
+          const rect = new Rect({
+            left: data.x,
+            top: data.y,
+            width: data.width,
+            height: data.height,
+            fill: `${color}33`,
+            stroke: color,
+            strokeWidth: 2,
+            cornerColor: color,
+            cornerSize: 8,
+            transparentCorners: false,
+          })
+          rect.annotationId = data.id
+          rect.annotationType = 'bbox'
+          rect.labelId = data.labelId
+          canvas.add(rect)
+        } else if (annotation.type === 'polygon') {
+          const data = annotation as PolygonData
+          const fabricPoints = data.points.map(p => new Point(p[0], p[1]))
+          const polygon = new Polygon(fabricPoints, {
+            fill: `${color}33`,
+            stroke: color,
+            strokeWidth: 2,
+            cornerColor: color,
+            cornerSize: 8,
+            transparentCorners: false,
+          })
+          polygon.annotationId = data.id
+          polygon.annotationType = 'polygon'
+          polygon.labelId = data.labelId
+          canvas.add(polygon)
+        }
+        canvas.requestRenderAll()
+      }
+    }
+  }, [selectedLabelColor])
 
   const removeAnnotation = useCallback((id: string) => {
     setAnnotations(prev => prev.filter(a => a.id !== id))
@@ -183,6 +229,39 @@ export function useCanvas(options: UseCanvasOptions = {}) {
         
         opt.e.preventDefault()
         opt.e.stopPropagation()
+      })
+
+      // Panning with middle mouse button or when isPanning is true
+      canvas.on('mouse:down', (opt) => {
+        const e = opt.e as MouseEvent
+        // Middle mouse button (button 1) for panning
+        if (e.button === 1) {
+          setIsPanning(true)
+          lastPanPointRef.current = { x: e.clientX, y: e.clientY }
+          canvas.defaultCursor = 'grabbing'
+          e.preventDefault()
+        }
+      })
+
+      canvas.on('mouse:move', (opt) => {
+        if (lastPanPointRef.current) {
+          const e = opt.e as MouseEvent
+          const vpt = canvas.viewportTransform
+          if (vpt) {
+            vpt[4] += e.clientX - lastPanPointRef.current.x
+            vpt[5] += e.clientY - lastPanPointRef.current.y
+            canvas.requestRenderAll()
+            lastPanPointRef.current = { x: e.clientX, y: e.clientY }
+          }
+        }
+      })
+
+      canvas.on('mouse:up', () => {
+        if (lastPanPointRef.current) {
+          setIsPanning(false)
+          lastPanPointRef.current = null
+          canvas.defaultCursor = 'default'
+        }
       })
     }
     img.src = imageUrl
@@ -395,17 +474,16 @@ export function useCanvas(options: UseCanvasOptions = {}) {
         const x = Math.min(startPoint[0], pointer.x)
         const y = Math.min(startPoint[1], pointer.y)
 
-        const bbox = createBBox(x, y, width, height)
+        const bbox = { ...createBBox(x, y, width, height), labelColor: selectedLabelColor }
         const cmd = new AddAnnotationCommand(bbox, addAnnotation, removeAnnotation)
         historyRef.current.execute(cmd)
         updateHistoryState()
-
-        addBBoxToCanvas(bbox, selectedLabelColor)
+        // Note: addAnnotation now handles adding to canvas
       }
 
       drawingPointsRef.current = []
     }
-  }, [tool, isDrawing, selectedLabelId, selectedLabelColor, createBBox, addAnnotation, removeAnnotation, addBBoxToCanvas, updateHistoryState])
+  }, [tool, isDrawing, selectedLabelId, selectedLabelColor, createBBox, addAnnotation, removeAnnotation, updateHistoryState])
 
   const handleDoubleClick = useCallback(() => {
     const canvas = canvasRef.current
@@ -419,15 +497,14 @@ export function useCanvas(options: UseCanvasOptions = {}) {
         tempPolygonRef.current = null
       }
 
-      const polygon = createPolygon(drawingPointsRef.current)
+      const polygon = { ...createPolygon(drawingPointsRef.current), labelColor: selectedLabelColor }
       const cmd = new AddAnnotationCommand(polygon, addAnnotation, removeAnnotation)
       historyRef.current.execute(cmd)
       updateHistoryState()
-
-      addPolygonToCanvas(polygon, selectedLabelColor)
+      // Note: addAnnotation now handles adding to canvas
       drawingPointsRef.current = []
     }
-  }, [tool, selectedLabelId, selectedLabelColor, createPolygon, addAnnotation, removeAnnotation, addPolygonToCanvas, updateHistoryState])
+  }, [tool, selectedLabelId, selectedLabelColor, createPolygon, addAnnotation, removeAnnotation, updateHistoryState])
 
   // Bind canvas events
   useEffect(() => {
@@ -558,6 +635,34 @@ export function useCanvas(options: UseCanvasOptions = {}) {
     }))
   }, [annotations])
 
+  // Panning control (for space key)
+  const startPanning = useCallback(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    setIsPanning(true)
+    canvas.defaultCursor = 'grab'
+    canvas.selection = false
+    canvas.getObjects().forEach(obj => {
+      obj.selectable = false
+      obj.evented = false
+    })
+  }, [])
+
+  const stopPanning = useCallback(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    setIsPanning(false)
+    lastPanPointRef.current = null
+    canvas.defaultCursor = tool === 'select' ? 'default' : 'crosshair'
+    if (tool === 'select') {
+      canvas.selection = true
+      canvas.getObjects().forEach(obj => {
+        obj.selectable = true
+        obj.evented = true
+      })
+    }
+  }, [tool])
+
   // Cleanup
   useEffect(() => {
     return () => {
@@ -595,6 +700,11 @@ export function useCanvas(options: UseCanvasOptions = {}) {
     changeSelectedLabel,
     loadAnnotations,
     getAnnotationsForSave,
+
+    // Panning
+    isPanning,
+    startPanning,
+    stopPanning,
 
     // History
     undo,

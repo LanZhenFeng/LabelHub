@@ -67,6 +67,8 @@ export function AnnotationCanvas({
     deleteSelected,
     changeSelectedLabel,
     loadAnnotations,
+    startPanning,
+    stopPanning,
     undo,
     redo,
     canUndo,
@@ -174,10 +176,28 @@ export function AnnotationCanvas({
         resetZoom()
         return
       }
+
+      // Space for panning
+      if (e.key === ' ' && !e.repeat) {
+        e.preventDefault()
+        startPanning()
+        return
+      }
+    }
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === ' ') {
+        e.preventDefault()
+        stopPanning()
+      }
     }
 
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    window.addEventListener('keyup', handleKeyUp)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('keyup', handleKeyUp)
+    }
   }, [
     labels,
     selectedAnnotationId,
@@ -190,6 +210,8 @@ export function AnnotationCanvas({
     zoomIn,
     zoomOut,
     resetZoom,
+    startPanning,
+    stopPanning,
   ])
 
   // Handle label click
