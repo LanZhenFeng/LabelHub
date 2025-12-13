@@ -109,9 +109,9 @@ Week 7-9    ░░░░░░░░░░░░░░░░░░░░░░�
 - **Fabric.js** 集成与封装
 - 画布基础功能
   - 图片加载与渲染
-  - 缩放 (滚轮)
-  - 平移 (空格+拖拽)
-  - 重置视图 (双击)
+  - 缩放 (滚轮/触控板)
+  - 平移 (Space+拖拽/中键)
+  - 重置视图 (双击/Reset按钮)
 - 矩形工具 (BBox)
   - 拖拽绘制
   - 选中移动
@@ -139,6 +139,10 @@ Week 7-9    ░░░░░░░░░░░░░░░░░░░░░░�
   - `Delete` 删除选中
   - `Ctrl+Z` 撤销
   - `Ctrl+Y` 重做
+  - `Enter` 提交并下一张
+  - `←`/`→` 上一张/下一张
+  - `S` 跳过
+  - `?` 帮助对话框
   - `Enter` 提交下一张
   - `S` 跳过
   - `?` 显示帮助
@@ -639,13 +643,16 @@ const trackAnnotation = {
 - [x] CI 流水线可用 (GitHub Actions: lint + test + build)
 
 ### M1 Checklist
-- [ ] Fabric.js 画布集成
-- [ ] BBox 工具完整可用 (绘制/移动/调整/删除)
-- [ ] Polygon 工具完整可用 (顶点添加/编辑/闭合)
-- [ ] 画布快捷键系统可用 (V/R/P/Delete/Ctrl+Z/Y)
-- [ ] Undo/Redo 系统可用 (Command Pattern, 50步)
-- [ ] 无内存泄漏 (Chrome DevTools 验证)
+- [x] Fabric.js 画布集成
+- [x] BBox 工具完整可用 (绘制/移动/调整/删除)
+- [x] Polygon 工具完整可用 (顶点添加/编辑/闭合)
+- [x] 画布快捷键系统可用 (V/R/P/Delete/Ctrl+Z/Y/←/→)
+- [x] Undo/Redo 系统可用 (Command Pattern, 50步)
+- [x] 分类任务 Canvas 图片查看器 (统一缩放平移交互)
+- [x] 上下页导航 (←/→ 按钮和快捷键，限制仅已处理项目)
+- [x] 帮助系统 (? 键显示快捷键帮助)
 - [x] 状态机 (todo/in_progress/done/skipped/deleted) - *M0 已实现*
+- [x] 标注状态管理和持久化（防止切换时数据丢失）
 
 ### M2 Checklist
 - [ ] 虚拟列表实现

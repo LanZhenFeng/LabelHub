@@ -10,7 +10,11 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
 if TYPE_CHECKING:
-    from app.models.annotation import ClassificationAnnotation
+    from app.models.annotation import (
+        BBoxAnnotation,
+        ClassificationAnnotation,
+        PolygonAnnotation,
+    )
     from app.models.dataset import Dataset
 
 
@@ -71,6 +75,16 @@ class Item(Base):
     dataset: Mapped["Dataset"] = relationship("Dataset", back_populates="items")
     classifications: Mapped[list["ClassificationAnnotation"]] = relationship(
         "ClassificationAnnotation",
+        back_populates="item",
+        cascade="all, delete-orphan",
+    )
+    bboxes: Mapped[list["BBoxAnnotation"]] = relationship(
+        "BBoxAnnotation",
+        back_populates="item",
+        cascade="all, delete-orphan",
+    )
+    polygons: Mapped[list["PolygonAnnotation"]] = relationship(
+        "PolygonAnnotation",
         back_populates="item",
         cascade="all, delete-orphan",
     )

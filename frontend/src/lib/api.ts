@@ -114,6 +114,11 @@ export const datasetsApi = {
 export const itemsApi = {
   list: (datasetId: number, params?: { status?: string; page?: number; page_size?: number }) =>
     api.get<ItemListResponse>(`/datasets/${datasetId}/items`, { params }).then((r) => r.data),
+  get: (itemId: number) => api.get<Item>(`/items/${itemId}`).then((r) => r.data),
+  getPrevious: (itemId: number) =>
+    api.get<Item | null>(`/items/${itemId}/previous`).then((r) => r.data || null),
+  getNextByOrder: (itemId: number) =>
+    api.get<Item | null>(`/items/${itemId}/next`).then((r) => r.data || null),
   getNext: (datasetId: number) =>
     api.get<NextItemResponse>(`/datasets/${datasetId}/next-item`).then((r) => r.data),
   classify: (itemId: number, label: string) =>
@@ -121,6 +126,81 @@ export const itemsApi = {
   skip: (itemId: number, reason: string) =>
     api.post(`/items/${itemId}/skip`, { reason }).then((r) => r.data),
   delete: (itemId: number) => api.post(`/items/${itemId}/delete`).then((r) => r.data),
+  submit: (itemId: number) => api.post(`/items/${itemId}/submit`).then((r) => r.data),
+}
+
+// ===== Annotation Types =====
+
+export interface BBoxAnnotation {
+  id: number
+  item_id: number
+  label_id: number
+  label_name: string | null
+  label_color: string | null
+  x: number
+  y: number
+  width: number
+  height: number
+  attributes: Record<string, unknown> | null
+  user_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface PolygonAnnotation {
+  id: number
+  item_id: number
+  label_id: number
+  label_name: string | null
+  label_color: string | null
+  points: number[][]
+  attributes: Record<string, unknown> | null
+  user_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ItemAnnotations {
+  item_id: number
+  bboxes: BBoxAnnotation[]
+  polygons: PolygonAnnotation[]
+}
+
+export interface BBoxCreate {
+  label_id: number
+  x: number
+  y: number
+  width: number
+  height: number
+  attributes?: Record<string, unknown>
+}
+
+export interface PolygonCreate {
+  label_id: number
+  points: number[][]
+  attributes?: Record<string, unknown>
+}
+
+export interface BatchAnnotationsCreate {
+  bboxes: BBoxCreate[]
+  polygons: PolygonCreate[]
+}
+
+export const annotationsApi = {
+  getItemAnnotations: (itemId: number) =>
+    api.get<ItemAnnotations>(`/items/${itemId}/annotations`).then((r) => r.data),
+  createBBox: (itemId: number, bbox: BBoxCreate) =>
+    api.post<BBoxAnnotation>(`/items/${itemId}/bboxes`, bbox).then((r) => r.data),
+  updateBBox: (bboxId: number, bbox: Partial<BBoxCreate>) =>
+    api.put<BBoxAnnotation>(`/bboxes/${bboxId}`, bbox).then((r) => r.data),
+  deleteBBox: (bboxId: number) => api.delete(`/bboxes/${bboxId}`),
+  createPolygon: (itemId: number, polygon: PolygonCreate) =>
+    api.post<PolygonAnnotation>(`/items/${itemId}/polygons`, polygon).then((r) => r.data),
+  updatePolygon: (polygonId: number, polygon: Partial<PolygonCreate>) =>
+    api.put<PolygonAnnotation>(`/polygons/${polygonId}`, polygon).then((r) => r.data),
+  deletePolygon: (polygonId: number) => api.delete(`/polygons/${polygonId}`),
+  saveBatch: (itemId: number, batch: BatchAnnotationsCreate) =>
+    api.post<ItemAnnotations>(`/items/${itemId}/annotations/batch`, batch).then((r) => r.data),
 }
 
 export const labelsApi = {

@@ -8,6 +8,7 @@ import {
   Trash2,
   Loader2,
   ChevronRight,
+  ChevronLeft,
   Keyboard,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -37,6 +38,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { itemsApi, projectsApi, type Label as LabelType } from '@/lib/api'
+import { ImageViewer } from '@/components/ImageViewer'
 
 export default function AnnotatePage() {
   const { projectId, datasetId } = useParams<{ projectId: string; datasetId: string }>()
@@ -47,7 +49,6 @@ export default function AnnotatePage() {
   const [skipDialogOpen, setSkipDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [skipReason, setSkipReason] = useState('')
-  const [imageLoaded, setImageLoaded] = useState(false)
 
   // Fetch project for labels
   const { data: project } = useQuery({
@@ -77,7 +78,6 @@ export default function AnnotatePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['items', datasetId] })
       setSelectedLabel(null)
-      setImageLoaded(false)
       refetchNextItem()
     },
     onError: () => {
@@ -93,7 +93,6 @@ export default function AnnotatePage() {
       queryClient.invalidateQueries({ queryKey: ['items', datasetId] })
       setSkipDialogOpen(false)
       setSkipReason('')
-      setImageLoaded(false)
       refetchNextItem()
       toast({ title: 'Skipped', description: 'Item has been skipped' })
     },
@@ -105,11 +104,62 @@ export default function AnnotatePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['items', datasetId] })
       setDeleteDialogOpen(false)
-      setImageLoaded(false)
       refetchNextItem()
       toast({ title: 'Deleted', description: 'Item has been deleted' })
     },
   })
+
+  // Go to previous item (using server API - by dataset item order)
+  const goToPreviousItem = useCallback(async () => {
+    if (!item) return
+    
+    try {
+      const prevItem = await itemsApi.getPrevious(item.id)
+      if (!prevItem) {
+        toast({ title: 'No previous item', description: 'This is the first item' })
+        return
+      }
+      
+      queryClient.setQueryData(['nextItem', datasetId], (old: typeof nextItemData) => ({
+        ...old,
+        item: prevItem,
+      }))
+      setSelectedLabel(null)
+    } catch {
+      toast({ title: 'No previous item', description: 'This is the first item' })
+    }
+  }, [item, datasetId, queryClient, nextItemData, toast])
+
+  // Go to next processed item (skip todo items)
+  const goToNextItem = useCallback(async () => {
+    if (!item) return
+    
+    try {
+      const nextItem = await itemsApi.getNextByOrder(item.id)
+      if (!nextItem) {
+        toast({ title: 'No next item', description: 'This is the last item' })
+        return
+      }
+      
+      // Check if next item is unprocessed (todo)
+      if (nextItem.status === 'todo') {
+        toast({ 
+          title: 'Cannot skip forward', 
+          description: 'Please use Submit or Skip to proceed to unannotated items',
+          variant: 'default'
+        })
+        return
+      }
+      
+      queryClient.setQueryData(['nextItem', datasetId], (old: typeof nextItemData) => ({
+        ...old,
+        item: nextItem,
+      }))
+      setSelectedLabel(null)
+    } catch {
+      toast({ title: 'Error', description: 'Failed to load next item', variant: 'destructive' })
+    }
+  }, [item, datasetId, queryClient, nextItemData, toast])
 
   // Handle label selection
   const handleSelectLabel = useCallback(
@@ -171,12 +221,20 @@ export default function AnnotatePage() {
             setDeleteDialogOpen(true)
           }
           break
+        case 'ArrowLeft':
+          e.preventDefault()
+          goToPreviousItem()
+          break
+        case 'ArrowRight':
+          e.preventDefault()
+          goToNextItem()
+          break
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [labels, handleSelectLabel, handleSubmit, handleNext])
+  }, [labels, handleSelectLabel, handleSubmit, handleNext, goToPreviousItem, goToNextItem])
 
   // Pre-select label if item already has one
   useEffect(() => {
@@ -249,29 +307,13 @@ export default function AnnotatePage() {
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Image area */}
-        <div className="flex-1 flex items-center justify-center p-8 bg-black/5">
-          {nextItemLoading ? (
+        {nextItemLoading ? (
+          <div className="flex-1 flex items-center justify-center bg-black/5">
             <Skeleton className="w-full max-w-3xl aspect-video" />
-          ) : item ? (
-            <div className="relative max-w-full max-h-full">
-              {!imageLoaded && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-                </div>
-              )}
-              <img
-                key={item.id}
-                src={item.image_url}
-                alt={item.filename}
-                className={cn(
-                  'max-w-full max-h-[calc(100vh-200px)] object-contain rounded-lg shadow-lg transition-opacity',
-                  imageLoaded ? 'opacity-100' : 'opacity-0'
-                )}
-                onLoad={() => setImageLoaded(true)}
-              />
-            </div>
-          ) : null}
-        </div>
+          </div>
+        ) : item ? (
+          <ImageViewer imageUrl={item.image_url} className="flex-1 flex flex-col" />
+        ) : null}
 
         {/* Sidebar */}
         <aside className="w-80 bg-card border-l flex flex-col">
@@ -317,6 +359,30 @@ export default function AnnotatePage() {
 
           {/* Actions */}
           <div className="p-4 border-t space-y-3">
+            {/* Navigation buttons */}
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={goToPreviousItem}
+                title="Previous (←)"
+              >
+                <ChevronLeft className="w-4 h-4 mr-1" />
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={goToNextItem}
+                title="Next (→)"
+              >
+                Next
+                <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            </div>
+
             <Button
               className="w-full"
               size="lg"
@@ -326,7 +392,7 @@ export default function AnnotatePage() {
               {classifyMutation.isPending ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : (
-                <ChevronRight className="w-4 h-4 mr-2" />
+                <Check className="w-4 h-4 mr-2" />
               )}
               Submit & Next
               <kbd className="ml-auto text-xs opacity-70">Enter</kbd>
@@ -357,7 +423,10 @@ export default function AnnotatePage() {
           <Card className="m-4 mt-0 p-3 bg-muted/50">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Keyboard className="w-4 h-4" />
-              <span>1-9: Select label | Enter: Submit | Space: Next | S: Skip</span>
+              <div className="flex flex-col gap-1">
+                <span>1-9: Label | Enter: Submit | S: Skip</span>
+                <span>←/→: Prev/Next | Scroll: Zoom | Space+Drag: Pan</span>
+              </div>
             </div>
           </Card>
         </aside>

@@ -115,7 +115,6 @@ async def get_next_item(
         # Set status to in_progress if todo
         if item.status == ItemStatus.TODO:
             item.status = ItemStatus.IN_PROGRESS
-            await db.flush()
 
         # Write open event
         event = AnnotationEvent(
@@ -127,6 +126,7 @@ async def get_next_item(
         )
         db.add(event)
         await db.flush()
+        await db.refresh(item)  # Refresh to get updated_at
 
         return NextItemResponse(
             item=_item_to_response(item, dataset.root_path),
@@ -141,6 +141,100 @@ async def get_next_item(
         total_count=total_count,
         done_count=done_count,
     )
+
+
+@router.get("/items/{item_id}", response_model=ItemResponse)
+async def get_item(
+    item_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get a single item by ID."""
+    query = (
+        select(Item)
+        .options(selectinload(Item.dataset), selectinload(Item.classifications))
+        .where(Item.id == item_id)
+    )
+    result = await db.execute(query)
+    item = result.scalar_one_or_none()
+
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    return _item_to_response(item, item.dataset.root_path)
+
+
+@router.get("/items/{item_id}/previous", response_model=ItemResponse | None)
+async def get_previous_item(
+    item_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get the previous item in the dataset (by ID order)."""
+    # Get current item to know dataset
+    current_query = (
+        select(Item)
+        .options(selectinload(Item.dataset))
+        .where(Item.id == item_id)
+    )
+    result = await db.execute(current_query)
+    current_item = result.scalar_one_or_none()
+
+    if not current_item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    # Get previous item (smaller ID in same dataset, excluding deleted)
+    prev_query = (
+        select(Item)
+        .options(selectinload(Item.dataset), selectinload(Item.classifications))
+        .where(Item.dataset_id == current_item.dataset_id)
+        .where(Item.id < item_id)
+        .where(Item.status != ItemStatus.DELETED)
+        .order_by(Item.id.desc())
+        .limit(1)
+    )
+    result = await db.execute(prev_query)
+    prev_item = result.scalar_one_or_none()
+
+    if not prev_item:
+        return None
+
+    return _item_to_response(prev_item, prev_item.dataset.root_path)
+
+
+@router.get("/items/{item_id}/next", response_model=ItemResponse | None)
+async def get_next_item_by_order(
+    item_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get the next item in the dataset (by ID order, regardless of status)."""
+    # Get current item to know dataset
+    current_query = (
+        select(Item)
+        .options(selectinload(Item.dataset))
+        .where(Item.id == item_id)
+    )
+    result = await db.execute(current_query)
+    current_item = result.scalar_one_or_none()
+
+    if not current_item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    # Get next item (larger ID in same dataset, excluding deleted)
+    next_query = (
+        select(Item)
+        .options(selectinload(Item.dataset), selectinload(Item.classifications))
+        .where(Item.dataset_id == current_item.dataset_id)
+        .where(Item.id > item_id)
+        .where(Item.status != ItemStatus.DELETED)
+        .order_by(Item.id.asc())
+        .limit(1)
+    )
+    result = await db.execute(next_query)
+    next_item = result.scalar_one_or_none()
+
+    if not next_item:
+        return None
+
+    return _item_to_response(next_item, next_item.dataset.root_path)
 
 
 @router.get("/items/{item_id}/thumb")
