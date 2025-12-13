@@ -35,7 +35,7 @@ const MAX_CACHE_SIZE = 200 * 1024 * 1024 // 200MB
 const MAX_ITEM_SIZE = 10 * 1024 * 1024 // 10MB per image
 
 class ImageCache {
-  private db: IDBPDatabase<ImageCacheDB> | null = null
+  private db: IDBPDatabase | null = null
   private initPromise: Promise<void> | null = null
 
   /**
@@ -47,13 +47,13 @@ class ImageCache {
 
     this.initPromise = (async () => {
       try {
-        this.db = await openDB<ImageCacheDB>(DB_NAME, DB_VERSION, {
+        this.db = await openDB(DB_NAME, DB_VERSION, {
           upgrade(db) {
             // Images store
             if (!db.objectStoreNames.contains(STORE_IMAGES)) {
               const imageStore = db.createObjectStore(STORE_IMAGES, { keyPath: 'url' })
-              imageStore.createIndex('accessed', 'accessed')
-              imageStore.createIndex('size', 'size')
+              imageStore.createIndex('accessed', 'accessed', { unique: false })
+              imageStore.createIndex('size', 'size', { unique: false })
             }
 
             // Metadata store
