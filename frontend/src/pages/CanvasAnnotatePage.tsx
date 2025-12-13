@@ -281,14 +281,6 @@ export default function CanvasAnnotatePage() {
     }
   }, [item, datasetId, queryClient, nextItemData, toast])
 
-  // Handle right-click to submit
-  const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    if (currentAnnotations.length > 0 && !submitMutation.isPending) {
-      submitMutation.mutate()
-    }
-  }, [currentAnnotations, submitMutation])
-
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -470,8 +462,8 @@ export default function CanvasAnnotatePage() {
         </Button>
       </header>
 
-      {/* Main content - right click to submit */}
-      <div className="flex-1 overflow-hidden" onContextMenu={handleContextMenu}>
+      {/* Main content */}
+      <div className="flex-1 overflow-hidden">
         {nextItemLoading ? (
           <div className="flex items-center justify-center h-full">
             <Skeleton className="w-3/4 h-3/4" />
