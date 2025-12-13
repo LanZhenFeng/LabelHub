@@ -121,6 +121,12 @@ export default function CanvasAnnotatePage() {
     return [...bboxes, ...polygons]
   }, [existingAnnotations])
 
+  // Reset currentAnnotations when item or initialAnnotations change
+  useEffect(() => {
+    setCurrentAnnotations(initialAnnotations)
+    setIsDirty(false)
+  }, [item?.id, initialAnnotations])
+
   // Save batch mutation
   const saveMutation = useMutation({
     mutationFn: async () => {

@@ -136,25 +136,28 @@ export default function AnnotatePage() {
     }
   }, [item, datasetId, queryClient, nextItemData, toast])
 
-  // Go to next item (without submitting - just navigate)
+  // Go to next item (by order, not next unannotated)
   const goToNextItem = useCallback(async () => {
     if (!item) return
     
     try {
-      // Get next item by ID order
-      const response = await itemsApi.getNext(Number(datasetId))
-      if (response.item && response.item.id !== item.id) {
-        queryClient.setQueryData(['nextItem', datasetId], response)
-        setSelectedLabel(null)
-        setImageLoaded(false)
-        setImageZoom(1)
-      } else {
-        toast({ title: 'No next item', description: 'This is the last item or all done' })
+      const nextItem = await itemsApi.getNextByOrder(item.id)
+      if (!nextItem) {
+        toast({ title: 'No next item', description: 'This is the last item' })
+        return
       }
+      
+      queryClient.setQueryData(['nextItem', datasetId], (old: typeof nextItemData) => ({
+        ...old,
+        item: nextItem,
+      }))
+      setSelectedLabel(null)
+      setImageLoaded(false)
+      setImageZoom(1)
     } catch {
       toast({ title: 'Error', description: 'Failed to load next item', variant: 'destructive' })
     }
-  }, [item, datasetId, queryClient, toast])
+  }, [item, datasetId, queryClient, nextItemData, toast])
 
   // Handle label selection
   const handleSelectLabel = useCallback(
@@ -295,7 +298,23 @@ export default function AnnotatePage() {
           </Button>
         </Link>
 
-        {/* Navigation buttons */}
+        <div className="flex-1">
+          <div className="flex items-center gap-4">
+            <div className="flex-1 max-w-md">
+              <Progress value={progress} className="h-2" />
+            </div>
+            <span className="text-sm text-muted-foreground whitespace-nowrap">
+              {nextItemData?.done_count ?? 0} / {nextItemData?.total_count ?? 0} ({Math.round(progress)}
+              %)
+            </span>
+          </div>
+        </div>
+
+        <div className="text-sm text-muted-foreground">
+          {nextItemData?.remaining_count ?? 0} remaining
+        </div>
+
+        {/* Navigation buttons on the right */}
         <div className="flex items-center gap-1">
           <Button
             variant="outline"
@@ -313,22 +332,6 @@ export default function AnnotatePage() {
           >
             <ChevronRight className="w-4 h-4" />
           </Button>
-        </div>
-
-        <div className="flex-1">
-          <div className="flex items-center gap-4">
-            <div className="flex-1 max-w-md">
-              <Progress value={progress} className="h-2" />
-            </div>
-            <span className="text-sm text-muted-foreground whitespace-nowrap">
-              {nextItemData?.done_count ?? 0} / {nextItemData?.total_count ?? 0} ({Math.round(progress)}
-              %)
-            </span>
-          </div>
-        </div>
-
-        <div className="text-sm text-muted-foreground">
-          {nextItemData?.remaining_count ?? 0} remaining
         </div>
       </header>
 
