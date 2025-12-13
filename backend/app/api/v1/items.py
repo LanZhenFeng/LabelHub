@@ -115,7 +115,6 @@ async def get_next_item(
         # Set status to in_progress if todo
         if item.status == ItemStatus.TODO:
             item.status = ItemStatus.IN_PROGRESS
-            await db.flush()
 
         # Write open event
         event = AnnotationEvent(
@@ -127,6 +126,7 @@ async def get_next_item(
         )
         db.add(event)
         await db.flush()
+        await db.refresh(item)  # Refresh to get updated_at
 
         return NextItemResponse(
             item=_item_to_response(item, dataset.root_path),
