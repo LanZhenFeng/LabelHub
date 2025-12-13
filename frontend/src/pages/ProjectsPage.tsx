@@ -40,14 +40,26 @@ import { useToast } from '@/hooks/use-toast'
 import { projectsApi, datasetsApi, type Project, type Dataset } from '@/lib/api'
 
 const PRESET_COLORS = [
-  '#EF4444',
-  '#F97316',
-  '#EAB308',
-  '#22C55E',
-  '#14B8A6',
-  '#3B82F6',
-  '#8B5CF6',
-  '#EC4899',
+  '#EF4444', // 红色
+  '#F97316', // 橙色
+  '#F59E0B', // 琥珀色
+  '#EAB308', // 黄色
+  '#84CC16', // 青柠色
+  '#22C55E', // 绿色
+  '#10B981', // 翠绿色
+  '#14B8A6', // 蓝绿色
+  '#06B6D4', // 青色
+  '#0EA5E9', // 天蓝色
+  '#3B82F6', // 蓝色
+  '#6366F1', // 靛蓝色
+  '#8B5CF6', // 紫色
+  '#A855F7', // 紫红色
+  '#D946EF', // 品红色
+  '#EC4899', // 粉色
+  '#F43F5E', // 玫瑰色
+  '#64748B', // 石板灰
+  '#6B7280', // 灰色
+  '#78716C', // 暖灰色
 ]
 
 const TASK_TYPE_MAP: Record<string, string> = {
@@ -222,20 +234,51 @@ export default function ProjectsPage() {
                           />
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-3" align="start">
-                          <div className="grid grid-cols-4 gap-2">
-                            {PRESET_COLORS.map((color) => (
-                              <button
-                                key={color}
-                                type="button"
-                                className="w-8 h-8 rounded border-2 transition-all hover:scale-110"
-                                style={{
-                                  backgroundColor: color,
-                                  borderColor: label.color === color ? 'hsl(var(--primary))' : 'transparent',
-                                }}
-                                onClick={() => handleColorChange(index, color)}
-                                title={color}
-                              />
-                            ))}
+                          <div className="space-y-3">
+                            {/* 预设颜色 */}
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground mb-2">预设颜色</p>
+                              <div className="grid grid-cols-5 gap-2">
+                                {PRESET_COLORS.map((color) => (
+                                  <button
+                                    key={color}
+                                    type="button"
+                                    className="w-8 h-8 rounded border-2 transition-all hover:scale-110"
+                                    style={{
+                                      backgroundColor: color,
+                                      borderColor: label.color === color ? 'hsl(var(--primary))' : 'transparent',
+                                    }}
+                                    onClick={() => handleColorChange(index, color)}
+                                    title={color}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                            {/* 自定义颜色 */}
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground mb-2">自定义颜色</p>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="color"
+                                  value={label.color}
+                                  onChange={(e) => handleColorChange(index, e.target.value.toUpperCase())}
+                                  className="w-12 h-8 rounded border cursor-pointer"
+                                />
+                                <Input
+                                  type="text"
+                                  value={label.color}
+                                  onChange={(e) => {
+                                    const value = e.target.value.toUpperCase()
+                                    if (/^#[0-9A-F]{0,6}$/.test(value)) {
+                                      handleColorChange(index, value)
+                                    }
+                                  }}
+                                  placeholder="#RRGGBB"
+                                  className="flex-1 h-8 font-mono text-xs"
+                                  maxLength={7}
+                                />
+                              </div>
+                            </div>
                           </div>
                         </PopoverContent>
                       </Popover>
