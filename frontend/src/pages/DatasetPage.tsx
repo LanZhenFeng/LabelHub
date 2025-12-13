@@ -64,7 +64,7 @@ export default function DatasetPage() {
   
   // Export dialog state
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
-  const [exportFormat, setExportFormat] = useState<'coco' | 'yolo' | 'voc' | 'csv' | 'json' | 'imagenet'>('coco')
+  const [exportFormat, setExportFormat] = useState<'coco' | 'yolo' | 'voc' | 'csv' | 'json' | 'imagenet'>('csv')
   const [includeImages, setIncludeImages] = useState(false)
 
   const { data: project } = useQuery({
@@ -143,6 +143,16 @@ export default function DatasetPage() {
   const handleStartAnnotation = () => {
     navigate(`/projects/${projectId}/datasets/${datasetId}/annotate`)
   }
+  
+  // Update export format when project changes
+  const handleOpenExportDialog = () => {
+    // Set default format based on task type when opening dialog
+    if (project) {
+      const defaultFormat = project.task_type === 'classification' ? 'csv' : 'coco'
+      setExportFormat(defaultFormat as any)
+    }
+    setExportDialogOpen(true)
+  }
 
   // Export mutation
   const exportMutation = useMutation({
@@ -197,7 +207,7 @@ export default function DatasetPage() {
           </Button>
           <Button
             variant="outline"
-            onClick={() => setExportDialogOpen(true)}
+            onClick={handleOpenExportDialog}
             disabled={!dataset || dataset.done_count === 0}
           >
             <Download className="w-4 h-4 mr-2" />
