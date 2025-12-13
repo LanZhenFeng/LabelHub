@@ -3,7 +3,7 @@
  * For detection (bbox) and segmentation (polygon) task types
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -121,10 +121,16 @@ export default function CanvasAnnotatePage() {
     return [...bboxes, ...polygons]
   }, [existingAnnotations])
 
-  // Reset currentAnnotations when item or initialAnnotations change
+  // Sync currentAnnotations with initialAnnotations when they're ready
+  // This ensures annotations are loaded when returning to an annotated item
+  const prevItemIdRef = useRef<number | null>(null)
   useEffect(() => {
-    setCurrentAnnotations(initialAnnotations)
-    setIsDirty(false)
+    if (item?.id !== prevItemIdRef.current) {
+      // Item changed, reset to initial annotations
+      setCurrentAnnotations(initialAnnotations)
+      setIsDirty(false)
+      prevItemIdRef.current = item?.id || null
+    }
   }, [item?.id, initialAnnotations])
 
   // Save batch mutation

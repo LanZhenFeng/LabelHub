@@ -313,26 +313,6 @@ export default function AnnotatePage() {
         <div className="text-sm text-muted-foreground">
           {nextItemData?.remaining_count ?? 0} remaining
         </div>
-
-        {/* Navigation buttons on the right */}
-        <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={goToPreviousItem}
-            title="Previous (←)"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={goToNextItem}
-            title="Next (→)"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </Button>
-        </div>
       </header>
 
       {/* Main content */}
@@ -341,12 +321,15 @@ export default function AnnotatePage() {
         <div 
           className="flex-1 flex items-center justify-center p-8 bg-black/5 overflow-auto"
           onWheel={(e) => {
-            e.preventDefault()
-            const delta = e.deltaY
-            setImageZoom(z => {
-              const newZoom = z * (delta > 0 ? 0.9 : 1.1)
-              return Math.min(Math.max(newZoom, 0.5), 5)
-            })
+            if (e.ctrlKey || e.metaKey) {
+              // Only zoom when Ctrl/Cmd is held (like detection/segmentation)
+              e.preventDefault()
+              const delta = e.deltaY
+              setImageZoom(z => {
+                const newZoom = z * (delta > 0 ? 0.9 : 1.1)
+                return Math.min(Math.max(newZoom, 0.5), 5)
+              })
+            }
           }}
         >
           {nextItemLoading ? (
@@ -422,6 +405,30 @@ export default function AnnotatePage() {
 
           {/* Actions */}
           <div className="p-4 border-t space-y-3">
+            {/* Navigation buttons */}
+            <div className="flex gap-2 mb-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="flex-1"
+                onClick={goToPreviousItem}
+                title="Previous (←)"
+              >
+                <ChevronLeft className="w-4 h-4 mr-1" />
+                Previous
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="flex-1"
+                onClick={goToNextItem}
+                title="Next (→)"
+              >
+                Next
+                <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            </div>
+
             <Button
               className="w-full"
               size="lg"
@@ -431,7 +438,7 @@ export default function AnnotatePage() {
               {classifyMutation.isPending ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : (
-                <ChevronRight className="w-4 h-4 mr-2" />
+                <Check className="w-4 h-4 mr-2" />
               )}
               Submit & Next
               <kbd className="ml-auto text-xs opacity-70">Enter</kbd>

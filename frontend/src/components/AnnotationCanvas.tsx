@@ -85,15 +85,16 @@ export function AnnotationCanvas({
     }
   }, [imageUrl, initCanvas])
 
-  // Load initial annotations
+  // Load initial annotations when imageUrl changes (new item loaded)
   useEffect(() => {
-    if (initialAnnotations.length > 0 && labels.length > 0) {
+    if (imageUrl && labels.length > 0) {
+      // Always call loadAnnotations, even if empty (to clear previous annotations)
       loadAnnotations(
         initialAnnotations,
         labels.map(l => ({ id: l.id, color: l.color }))
       )
     }
-  }, [initialAnnotations, labels, loadAnnotations])
+  }, [imageUrl, labels, loadAnnotations]) // Depend on imageUrl instead of initialAnnotations
 
   // Set default label if not selected
   useEffect(() => {
