@@ -1,21 +1,9 @@
-/**
- * Canvas Annotation Page
- * For detection (bbox) and segmentation (polygon) task types
- */
-
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft,
   Check,
-  SkipForward,
-  Trash2,
-  Loader2,
-  ChevronRight,
-  ChevronLeft,
-  Keyboard,
-  Save,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
@@ -40,6 +28,8 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import {
   itemsApi,
@@ -62,7 +52,6 @@ export default function CanvasAnnotatePage() {
   const [skipReason, setSkipReason] = useState('')
   const [currentAnnotations, setCurrentAnnotations] = useState<AnnotationData[]>([])
   const [isDirty, setIsDirty] = useState(false)
-  const [helpOpen, setHelpOpen] = useState(false)
 
   // Fetch project for labels
   const { data: project } = useQuery({
@@ -154,7 +143,6 @@ export default function CanvasAnnotatePage() {
     const annotationsChanged = JSON.stringify(initialAnnotations) !== JSON.stringify(prevAnnotationsRef.current)
     
     if (itemChanged || annotationsChanged) {
-      console.log('Updating annotations:', { itemId: item?.id, count: initialAnnotations.length, itemChanged, annotationsChanged })
       setCurrentAnnotations(initialAnnotations)
       setIsDirty(false)
       prevItemIdRef.current = item?.id || null
@@ -189,10 +177,10 @@ export default function CanvasAnnotatePage() {
     onSuccess: () => {
       setIsDirty(false)
       queryClient.invalidateQueries({ queryKey: ['annotations', item?.id] })
-      toast({ title: 'Saved', description: 'Annotations saved successfully' })
+      toast({ title: '保存成功', description: '标注已保存' })
     },
     onError: () => {
-      toast({ title: 'Error', description: 'Failed to save annotations', variant: 'destructive' })
+      toast({ title: '保存失败', description: '无法保存标注', variant: 'destructive' })
     },
   })
 
@@ -212,10 +200,10 @@ export default function CanvasAnnotatePage() {
       // Don't manually clear - let useEffect handle it when new item loads
       setIsDirty(false)
       refetchNextItem()
-      toast({ title: 'Submitted', description: 'Item marked as done' })
+      toast({ title: '提交成功', description: '已标记为完成' })
     },
     onError: () => {
-      toast({ title: 'Error', description: 'Failed to submit', variant: 'destructive' })
+      toast({ title: '提交失败', description: '无法提交', variant: 'destructive' })
     },
   })
 
@@ -230,7 +218,7 @@ export default function CanvasAnnotatePage() {
       setSkipReason('')
       setIsDirty(false)
       refetchNextItem()
-      toast({ title: 'Skipped', description: 'Item has been skipped' })
+      toast({ title: '已跳过', description: '该图片已标记为跳过' })
     },
   })
 
@@ -243,7 +231,7 @@ export default function CanvasAnnotatePage() {
       setDeleteDialogOpen(false)
       setIsDirty(false)
       refetchNextItem()
-      toast({ title: 'Deleted', description: 'Item has been deleted' })
+      toast({ title: '已删除', description: '图片已删除' })
     },
   })
 
@@ -260,7 +248,7 @@ export default function CanvasAnnotatePage() {
     try {
       const prevItem = await itemsApi.getPrevious(item.id)
       if (!prevItem) {
-        toast({ title: 'No previous item', description: 'This is the first item' })
+        toast({ title: '没有上一张', description: '这是第一张图片' })
         return
       }
       
@@ -270,7 +258,7 @@ export default function CanvasAnnotatePage() {
       }))
       // Don't manually clear - let useEffect handle it
     } catch {
-      toast({ title: 'No previous item', description: 'This is the first item' })
+      toast({ title: '没有上一张', description: '这是第一张图片' })
     }
   }, [item, datasetId, queryClient, nextItemData, toast])
 
@@ -281,15 +269,15 @@ export default function CanvasAnnotatePage() {
     try {
       const nextItem = await itemsApi.getNextByOrder(item.id)
       if (!nextItem) {
-        toast({ title: 'No next item', description: 'This is the last item' })
+        toast({ title: '没有下一张', description: '这是最后一张图片' })
         return
       }
       
       // Check if next item is unprocessed (todo)
       if (nextItem.status === 'todo') {
         toast({ 
-          title: 'Cannot skip forward', 
-          description: 'Please use Submit or Skip to proceed to unannotated items',
+          title: '无法跳转', 
+          description: '请使用“提交”或“跳过”来处理当前图片',
           variant: 'default'
         })
         return
@@ -300,59 +288,9 @@ export default function CanvasAnnotatePage() {
         item: nextItem,
       }))
     } catch {
-      toast({ title: 'Error', description: 'Failed to load next item', variant: 'destructive' })
+      toast({ title: '错误', description: '无法加载下一张', variant: 'destructive' })
     }
   }, [item, datasetId, queryClient, nextItemData, toast])
-
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-        return
-      }
-
-      switch (e.key) {
-        case 'Enter':
-          e.preventDefault()
-          if (currentAnnotations.length > 0) {
-            submitMutation.mutate()
-          }
-          break
-        case 's':
-        case 'S':
-          if (e.ctrlKey || e.metaKey) {
-            e.preventDefault()
-            saveMutation.mutate()
-          } else {
-            e.preventDefault()
-            setSkipDialogOpen(true)
-          }
-          break
-        case '?':
-          e.preventDefault()
-          setHelpOpen(true)
-          break
-        case 'Delete':
-        case 'Backspace':
-          if (e.ctrlKey || e.metaKey) {
-            e.preventDefault()
-            setDeleteDialogOpen(true)
-          }
-          break
-        case 'ArrowLeft':
-          e.preventDefault()
-          goToPreviousItem()
-          break
-        case 'ArrowRight':
-          e.preventDefault()
-          goToNextItem()
-          break
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [currentAnnotations, submitMutation, saveMutation, goToPreviousItem, goToNextItem])
 
   const progress = nextItemData
     ? (nextItemData.done_count / Math.max(nextItemData.total_count, 1)) * 100
@@ -366,19 +304,17 @@ export default function CanvasAnnotatePage() {
           <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-6">
             <Check className="w-10 h-10 text-green-600" />
           </div>
-          <h1 className="text-2xl font-bold mb-2">All Done!</h1>
-          <p className="text-muted-foreground mb-6">
-            You've completed all items in this dataset. Great work!
-          </p>
+          <h1 className="text-2xl font-bold mb-2">全部完成</h1>
+          <p className="text-muted-foreground mb-6">你已完成该数据集所有标注任务。</p>
           <div className="flex gap-4 justify-center">
             <Link to={`/projects/${projectId}/datasets/${datasetId}`}>
               <Button variant="outline">
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Dataset
+                返回数据集
               </Button>
             </Link>
             <Link to="/projects">
-              <Button>View All Projects</Button>
+              <Button>查看项目列表</Button>
             </Link>
           </div>
         </div>
@@ -387,102 +323,43 @@ export default function CanvasAnnotatePage() {
   }
 
   return (
-    <div className="flex flex-col h-full bg-muted/30">
+    <div className="flex flex-col h-full bg-gradient-to-b from-background to-muted/30">
       {/* Header */}
-      <header className="flex items-center gap-4 px-4 py-2 bg-card border-b">
-        <Link to={`/projects/${projectId}/datasets/${datasetId}`}>
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-        </Link>
-
-        {/* File info */}
-        <div className="flex-1 min-w-0">
-          <h3 className="font-medium truncate text-sm">{item?.filename ?? 'Loading...'}</h3>
-          <p className="text-xs text-muted-foreground truncate">{item?.rel_path}</p>
-        </div>
-
-        {/* Progress */}
-        <div className="flex items-center gap-3">
-          <div className="w-32">
-            <Progress value={progress} className="h-2" />
+      <header className="sticky top-0 z-10 flex items-center justify-between px-6 py-3 bg-card/80 backdrop-blur supports-[backdrop-filter]:bg-card/60 border-b shadow-sm">
+        <div className="flex items-center gap-4">
+          <Link to={`/projects/${projectId}/datasets/${datasetId}`}>
+            <Button variant="ghost" size="icon" className="-ml-2 hover:bg-muted/80">
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+          </Link>
+          
+          <div className="flex flex-col">
+            <h1 className="font-semibold text-sm leading-none">{project?.name || '标注任务'}</h1>
+            <div className="flex items-center gap-2 mt-1">
+               <span className="text-xs text-muted-foreground">标注进度</span>
+               <span className={cn("text-xs font-medium", progress === 100 ? "text-green-600" : "text-primary")}>
+                {Math.round(progress)}%
+              </span>
+            </div>
           </div>
-          <span className="text-xs text-muted-foreground whitespace-nowrap">
-            {nextItemData?.done_count ?? 0} / {nextItemData?.total_count ?? 0}
-          </span>
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center gap-2">
-          {/* Navigation buttons */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={goToPreviousItem}
-            title="Previous (←)"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={goToNextItem}
-            title="Next (→)"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => saveMutation.mutate()}
-            disabled={!isDirty || saveMutation.isPending}
-          >
-            {saveMutation.isPending ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Save className="w-4 h-4" />
-            )}
-            <span className="ml-1 hidden sm:inline">Save</span>
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setSkipDialogOpen(true)}
-            disabled={!item}
-          >
-            <SkipForward className="w-4 h-4" />
-            <span className="ml-1 hidden sm:inline">Skip</span>
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setDeleteDialogOpen(true)}
-            disabled={!item}
-          >
-            <Trash2 className="w-4 h-4" />
-          </Button>
-
-          <Button
-            size="sm"
-            onClick={() => submitMutation.mutate()}
-            disabled={submitMutation.isPending}
-          >
-            {submitMutation.isPending ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <ChevronRight className="w-4 h-4" />
-            )}
-            <span className="ml-1">Submit</span>
-          </Button>
+        <div className="flex-1 max-w-md px-8 flex flex-col justify-center gap-1.5">
+           <Progress value={progress} className="h-2 w-full" />
+           <div className="flex justify-between text-[10px] text-muted-foreground font-medium px-0.5">
+              <span>{nextItemData?.done_count ?? 0} 完成</span>
+              <span>{nextItemData?.total_count ?? 0} 总计</span>
+           </div>
         </div>
 
-        {/* Help */}
-        <Button variant="ghost" size="icon" onClick={() => setHelpOpen(true)} title="Help (?)">
-          <Keyboard className="w-4 h-4" />
-        </Button>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 rounded-md border border-border/50">
+            <span className="text-xs text-muted-foreground font-medium">剩余</span>
+            <Badge variant="secondary" className="font-mono font-bold text-xs bg-background shadow-sm border-0">
+              {nextItemData?.remaining_count ?? 0}
+            </Badge>
+          </div>
+        </div>
       </header>
 
       {/* Main content */}
@@ -504,10 +381,23 @@ export default function CanvasAnnotatePage() {
         ) : item ? (
           <AnnotationCanvas
             imageUrl={item.image_url}
+            imageName={item.filename}
+            imagePath={item.rel_path}
+            imageSize={item.width && item.height ? { width: item.width, height: item.height } : undefined}
             labels={labels}
             initialAnnotations={currentAnnotations}
             onAnnotationsChange={handleAnnotationsChange}
             className="h-full"
+            // Actions
+            onSave={() => saveMutation.mutate()}
+            onSubmit={() => submitMutation.mutate()}
+            onSkip={() => setSkipDialogOpen(true)}
+            onDelete={() => setDeleteDialogOpen(true)}
+            onPrev={goToPreviousItem}
+            onNext={goToNextItem}
+            isSaving={saveMutation.isPending}
+            isSubmitting={submitMutation.isPending}
+            isDirty={isDirty}
           />
         ) : null}
       </div>
@@ -516,14 +406,14 @@ export default function CanvasAnnotatePage() {
       <Dialog open={skipDialogOpen} onOpenChange={setSkipDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Skip this item?</DialogTitle>
-            <DialogDescription>Please provide a reason for skipping.</DialogDescription>
+            <DialogTitle>跳过该图片？</DialogTitle>
+            <DialogDescription>请输入跳过原因，该图片将标记为“已跳过”。</DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <Label htmlFor="skip-reason">Reason</Label>
+            <Label htmlFor="skip-reason">原因</Label>
             <Input
               id="skip-reason"
-              placeholder="e.g., Image is blurry, Cannot identify objects..."
+              placeholder="例如：图片模糊 / 无法辨识目标…"
               value={skipReason}
               onChange={(e) => setSkipReason(e.target.value)}
               autoFocus
@@ -531,13 +421,13 @@ export default function CanvasAnnotatePage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setSkipDialogOpen(false)}>
-              Cancel
+              取消
             </Button>
             <Button
               onClick={() => item && skipMutation.mutate({ itemId: item.id, reason: skipReason })}
               disabled={!skipReason.trim() || skipMutation.isPending}
             >
-              {skipMutation.isPending ? 'Skipping...' : 'Skip Item'}
+              {skipMutation.isPending ? '跳过中...' : '确认跳过'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -547,140 +437,22 @@ export default function CanvasAnnotatePage() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this item?</AlertDialogTitle>
+            <AlertDialogTitle>确认删除该图片？</AlertDialogTitle>
             <AlertDialogDescription>
-              This will mark the item as deleted. You can restore it later if needed.
+              此操作将标记该图片为已删除。您稍后可以在回收站中恢复（如果支持）。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => item && deleteMutation.mutate(item.id)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+              {deleteMutation.isPending ? '删除中...' : '确认删除'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Help Dialog */}
-      <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Keyboard Shortcuts</DialogTitle>
-          </DialogHeader>
-          <div className="grid grid-cols-2 gap-4 py-4">
-            <div>
-              <h4 className="font-medium mb-2">Tools</h4>
-              <div className="space-y-1 text-sm">
-                <div className="flex justify-between">
-                  <span>Select</span>
-                  <kbd className="px-2 py-0.5 bg-muted rounded">V</kbd>
-                </div>
-                <div className="flex justify-between">
-                  <span>Rectangle (BBox)</span>
-                  <kbd className="px-2 py-0.5 bg-muted rounded">R</kbd>
-                </div>
-                <div className="flex justify-between">
-                  <span>Polygon</span>
-                  <kbd className="px-2 py-0.5 bg-muted rounded">P</kbd>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <h4 className="font-medium mb-2">Labels</h4>
-              <div className="space-y-1 text-sm">
-                <div className="flex justify-between">
-                  <span>Select Label 1-9</span>
-                  <kbd className="px-2 py-0.5 bg-muted rounded">1-9</kbd>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <h4 className="font-medium mb-2">Edit</h4>
-              <div className="space-y-1 text-sm">
-                <div className="flex justify-between">
-                  <span>Delete Selected</span>
-                  <kbd className="px-2 py-0.5 bg-muted rounded">Delete</kbd>
-                </div>
-                <div className="flex justify-between">
-                  <span>Undo</span>
-                  <kbd className="px-2 py-0.5 bg-muted rounded">Ctrl+Z</kbd>
-                </div>
-                <div className="flex justify-between">
-                  <span>Redo</span>
-                  <kbd className="px-2 py-0.5 bg-muted rounded">Ctrl+Y</kbd>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <h4 className="font-medium mb-2">View</h4>
-              <div className="space-y-1 text-sm">
-                <div className="flex justify-between">
-                  <span>Zoom</span>
-                  <kbd className="px-2 py-0.5 bg-muted rounded">Scroll</kbd>
-                </div>
-                <div className="flex justify-between">
-                  <span>Pan</span>
-                  <kbd className="px-2 py-0.5 bg-muted rounded">Space+Drag</kbd>
-                </div>
-                <div className="flex justify-between">
-                  <span>Reset View</span>
-                  <kbd className="px-2 py-0.5 bg-muted rounded">Dbl-click</kbd>
-                </div>
-              </div>
-            </div>
-
-            <div className="col-span-2">
-              <h4 className="font-medium mb-2">Actions</h4>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                <div className="flex justify-between">
-                  <span>Previous Item</span>
-                  <kbd className="px-2 py-0.5 bg-muted rounded">←</kbd>
-                </div>
-                <div className="flex justify-between">
-                  <span>Next Item</span>
-                  <kbd className="px-2 py-0.5 bg-muted rounded">→</kbd>
-                </div>
-                <div className="flex justify-between">
-                  <span>Save Draft</span>
-                  <kbd className="px-2 py-0.5 bg-muted rounded">Ctrl+S</kbd>
-                </div>
-                <div className="flex justify-between">
-                  <span>Submit & Next</span>
-                  <kbd className="px-2 py-0.5 bg-muted rounded">Enter</kbd>
-                </div>
-                <div className="flex justify-between">
-                  <span>Skip Item</span>
-                  <kbd className="px-2 py-0.5 bg-muted rounded">S</kbd>
-                </div>
-                <div className="flex justify-between">
-                  <span>Delete Item</span>
-                  <kbd className="px-2 py-0.5 bg-muted rounded">Ctrl+Del</kbd>
-                </div>
-                <div className="flex justify-between">
-                  <span>Show Help</span>
-                  <kbd className="px-2 py-0.5 bg-muted rounded">?</kbd>
-                </div>
-              </div>
-            </div>
-
-            <div className="col-span-2">
-              <h4 className="font-medium mb-2">Drawing Tips</h4>
-              <div className="space-y-1 text-sm text-muted-foreground">
-                <p>• Rectangle: Click and drag to draw a bounding box</p>
-                <p>• Polygon: Click to add vertices, double-click or Enter to close</p>
-                <p>• Select tool (V) to move, resize, or delete annotations</p>
-              </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
-

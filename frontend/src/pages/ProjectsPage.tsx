@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Plus, FolderOpen, Trash2, ImageIcon, BarChart3 } from 'lucide-react'
+import { Plus, FolderOpen, Trash2, ImageIcon, BarChart3, Clock, MoreHorizontal, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
   DialogContent,
@@ -24,6 +25,12 @@ import {
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Progress } from '@/components/ui/progress'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { useToast } from '@/hooks/use-toast'
 import { projectsApi, datasetsApi, type Project, type Dataset } from '@/lib/api'
 
@@ -37,6 +44,12 @@ const PRESET_COLORS = [
   '#8B5CF6',
   '#EC4899',
 ]
+
+const TASK_TYPE_MAP: Record<string, string> = {
+  classification: '图像分类',
+  detection: '目标检测',
+  segmentation: '语义分割',
+}
 
 export default function ProjectsPage() {
   const { toast } = useToast()
@@ -66,10 +79,10 @@ export default function ProjectsPage() {
       queryClient.invalidateQueries({ queryKey: ['projects'] })
       setIsCreateOpen(false)
       resetForm()
-      toast({ title: 'Project created', description: 'Your project has been created successfully.' })
+      toast({ title: '创建成功', description: '项目已成功创建。' })
     },
     onError: () => {
-      toast({ title: 'Error', description: 'Failed to create project.', variant: 'destructive' })
+      toast({ title: '创建失败', description: '无法创建项目。', variant: 'destructive' })
     },
   })
 
@@ -81,11 +94,11 @@ export default function ProjectsPage() {
       try {
         const result = await datasetsApi.scan(dataset.id)
         toast({
-          title: 'Dataset created',
-          description: `Added ${result.added_count} images from ${datasetPath}`,
+          title: '数据集创建成功',
+          description: `已从 ${datasetPath} 添加了 ${result.added_count} 张图片`,
         })
       } catch {
-        toast({ title: 'Dataset created', description: 'Scan failed, please try again.' })
+        toast({ title: '数据集创建成功', description: '扫描失败，请稍后重试。' })
       }
       queryClient.invalidateQueries({ queryKey: ['projects'] })
       queryClient.invalidateQueries({ queryKey: ['datasets', selectedProject?.id] })
@@ -94,7 +107,7 @@ export default function ProjectsPage() {
       setDatasetPath('')
     },
     onError: () => {
-      toast({ title: 'Error', description: 'Failed to create dataset.', variant: 'destructive' })
+      toast({ title: '创建失败', description: '无法创建数据集。', variant: 'destructive' })
     },
   })
 
@@ -102,7 +115,7 @@ export default function ProjectsPage() {
     mutationFn: projectsApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] })
-      toast({ title: 'Project deleted' })
+      toast({ title: '项目已删除' })
     },
   })
 
@@ -144,56 +157,56 @@ export default function ProjectsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
-          <p className="text-muted-foreground mt-1">Manage your annotation projects</p>
+          <h1 className="text-3xl font-bold tracking-tight">我的项目</h1>
+          <p className="text-muted-foreground mt-1">管理您的所有标注项目</p>
         </div>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="w-4 h-4 mr-2" />
-              New Project
+              新建项目
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
-              <DialogTitle>Create New Project</DialogTitle>
-              <DialogDescription>Set up a new annotation project with labels.</DialogDescription>
+              <DialogTitle>创建新项目</DialogTitle>
+              <DialogDescription>配置项目名称、类型及标签。</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Project Name</Label>
+                <Label htmlFor="name">项目名称</Label>
                 <Input
                   id="name"
-                  placeholder="e.g., Cat vs Dog Classification"
+                  placeholder="例如：猫狗分类"
                   value={projectName}
                   onChange={(e) => setProjectName(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="type">Task Type</Label>
+                <Label htmlFor="type">任务类型</Label>
                 <Select value={projectType} onValueChange={setProjectType}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="classification">Classification</SelectItem>
-                    <SelectItem value="detection">Detection</SelectItem>
-                    <SelectItem value="segmentation">Segmentation</SelectItem>
+                    <SelectItem value="classification">图像分类 (Classification)</SelectItem>
+                    <SelectItem value="detection">目标检测 (Detection)</SelectItem>
+                    <SelectItem value="segmentation">语义分割 (Segmentation)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Labels</Label>
+                <Label>标签设置</Label>
                 <div className="space-y-2">
                   {labels.map((label, index) => (
                     <div key={index} className="flex items-center gap-2">
-                      <kbd className="w-6 h-6 flex items-center justify-center text-xs">{index + 1}</kbd>
+                      <kbd className="w-6 h-6 flex items-center justify-center text-xs bg-muted rounded border">{index + 1}</kbd>
                       <div
-                        className="w-6 h-6 rounded border cursor-pointer"
+                        className="w-6 h-6 rounded border cursor-pointer ring-offset-background transition-colors hover:ring-2 hover:ring-ring hover:ring-offset-2"
                         style={{ backgroundColor: label.color }}
                       />
                       <Input
-                        placeholder={`Label ${index + 1}`}
+                        placeholder={`标签 ${index + 1}`}
                         value={label.name}
                         onChange={(e) => handleLabelChange(index, e.target.value)}
                         className="flex-1"
@@ -204,14 +217,14 @@ export default function ProjectsPage() {
                           size="icon"
                           onClick={() => handleRemoveLabel(index)}
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-4 h-4 text-muted-foreground hover:text-destructive" />
                         </Button>
                       )}
                     </div>
                   ))}
                   {labels.length < 9 && (
-                    <Button variant="outline" size="sm" onClick={handleAddLabel}>
-                      <Plus className="w-4 h-4 mr-1" /> Add Label
+                    <Button variant="outline" size="sm" onClick={handleAddLabel} className="w-full border-dashed">
+                      <Plus className="w-4 h-4 mr-1" /> 添加标签
                     </Button>
                   )}
                 </div>
@@ -219,13 +232,13 @@ export default function ProjectsPage() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
-                Cancel
+                取消
               </Button>
               <Button
                 onClick={handleCreateProject}
                 disabled={!projectName.trim() || createProjectMutation.isPending}
               >
-                {createProjectMutation.isPending ? 'Creating...' : 'Create Project'}
+                {createProjectMutation.isPending ? '创建中...' : '确认创建'}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -248,12 +261,14 @@ export default function ProjectsPage() {
           ))}
         </div>
       ) : projects?.length === 0 ? (
-        <Card className="p-12 text-center">
-          <FolderOpen className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-xl font-semibold mb-2">No projects yet</h3>
-          <p className="text-muted-foreground mb-4">Create your first project to get started</p>
-          <Button onClick={() => setIsCreateOpen(true)}>
-            <Plus className="w-4 h-4 mr-2" /> Create Project
+        <Card className="p-16 text-center border-dashed">
+          <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-6">
+            <FolderOpen className="w-10 h-10 text-muted-foreground" />
+          </div>
+          <h3 className="text-xl font-semibold mb-2">暂无项目</h3>
+          <p className="text-muted-foreground mb-6">创建您的第一个项目开始标注之旅</p>
+          <Button onClick={() => setIsCreateOpen(true)} size="lg">
+            <Plus className="w-4 h-4 mr-2" /> 新建项目
           </Button>
         </Card>
       ) : (
@@ -276,21 +291,21 @@ export default function ProjectsPage() {
       <Dialog open={isDatasetOpen} onOpenChange={setIsDatasetOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add Dataset to {selectedProject?.name}</DialogTitle>
-            <DialogDescription>Import images from a server path.</DialogDescription>
+            <DialogTitle>添加数据集 - {selectedProject?.name}</DialogTitle>
+            <DialogDescription>从服务器路径导入图片数据。</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="dataset-name">Dataset Name</Label>
+              <Label htmlFor="dataset-name">数据集名称</Label>
               <Input
                 id="dataset-name"
-                placeholder="e.g., Training Set"
+                placeholder="例如：训练集 A"
                 value={datasetName}
                 onChange={(e) => setDatasetName(e.target.value)}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="dataset-path">Server Path</Label>
+              <Label htmlFor="dataset-path">服务器路径 (Server Path)</Label>
               <Input
                 id="dataset-path"
                 placeholder="/data/images/cats"
@@ -298,13 +313,13 @@ export default function ProjectsPage() {
                 onChange={(e) => setDatasetPath(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                Path on the server where images are stored. Images will be scanned automatically.
+                服务器上存储图片的绝对路径，系统将自动扫描该目录下的图片。
               </p>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDatasetOpen(false)}>
-              Cancel
+              取消
             </Button>
             <Button
               onClick={() =>
@@ -316,13 +331,30 @@ export default function ProjectsPage() {
               }
               disabled={!datasetName.trim() || !datasetPath.trim() || createDatasetMutation.isPending}
             >
-              {createDatasetMutation.isPending ? 'Creating...' : 'Create & Scan'}
+              {createDatasetMutation.isPending ? '创建中...' : '创建并扫描'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
   )
+}
+
+function timeAgo(dateString: string) {
+  const date = new Date(dateString)
+  const now = new Date()
+  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+
+  if (seconds < 60) return '刚刚'
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}分钟前`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}小时前`
+  const days = Math.floor(hours / 24)
+  if (days < 30) return `${days}天前`
+  const months = Math.floor(days / 30)
+  if (months < 12) return `${months}个月前`
+  return `${Math.floor(months / 12)}年前`
 }
 
 function ProjectCard({
@@ -334,79 +366,162 @@ function ProjectCard({
   onAddDataset: () => void
   onDelete: () => void
 }) {
+  const [isExpanded, setIsExpanded] = useState(false)
   const { data: datasets } = useQuery({
     queryKey: ['datasets', project.id],
     queryFn: () => datasetsApi.list(project.id),
   })
 
   const progress = project.item_count > 0 ? (project.done_count / project.item_count) * 100 : 0
+  const taskTypeLabel = TASK_TYPE_MAP[project.task_type] || project.task_type
 
   return (
-    <Card className="group hover:shadow-md transition-shadow">
-      <CardHeader className="pb-3">
-        <div>
-          <CardTitle className="text-lg">{project.name}</CardTitle>
-          <CardDescription className="mt-1">
-            {project.task_type.charAt(0).toUpperCase() + project.task_type.slice(1)}
-          </CardDescription>
+    <Card className="group hover:shadow-lg hover:-translate-y-1 transition-all duration-300 border-muted/60">
+      <CardHeader className="pb-3 space-y-3">
+        <div className="flex items-start justify-between">
+          <div className="space-y-1.5">
+            <CardTitle className="text-xl font-semibold leading-none tracking-tight">
+              {project.name}
+            </CardTitle>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Badge variant="secondary" className="font-normal text-[10px] px-1.5 h-5">
+                {taskTypeLabel}
+              </Badge>
+              <span className="flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                {timeAgo(project.updated_at)}
+              </span>
+            </div>
+          </div>
         </div>
+
         {/* Labels */}
-        <div className="flex flex-wrap gap-1 mt-2">
-          {project.labels.slice(0, 5).map((label) => (
-            <span
-              key={label.id}
-              className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full"
-              style={{ backgroundColor: label.color + '20', color: label.color }}
-            >
-              <kbd className="text-[10px] opacity-70">{label.shortcut}</kbd>
-              {label.name}
-            </span>
-          ))}
-          {project.labels.length > 5 && (
-            <span className="text-xs text-muted-foreground px-1">+{project.labels.length - 5}</span>
+        <div className="flex items-center gap-1.5 min-h-[26px]">
+          <TooltipProvider>
+            {project.labels.slice(0, 4).map((label) => (
+              <Tooltip key={label.id}>
+                <TooltipTrigger asChild>
+                  <div
+                    className="h-2.5 w-8 rounded-full transition-all hover:h-3.5 cursor-help"
+                    style={{ backgroundColor: label.color }}
+                  />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: label.color }}
+                    />
+                    <span className="font-medium">{label.name}</span>
+                    {label.shortcut && (
+                      <kbd className="text-[10px] bg-muted px-1 rounded border min-w-[1.2em] text-center">{label.shortcut}</kbd>
+                    )}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            ))}
+          </TooltipProvider>
+          {project.labels.length > 4 && (
+             <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-[10px] text-muted-foreground font-medium cursor-help">
+                    +{project.labels.length - 4}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>还有 {project.labels.length - 4} 个标签</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+
+      <CardContent className="space-y-5">
         {/* Progress */}
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Progress</span>
-            <span className="font-medium">
-              {project.done_count} / {project.item_count}
+            <span className="text-muted-foreground font-medium text-xs uppercase tracking-wider">
+              总体进度
+            </span>
+            <span className="font-medium text-sm text-primary">
+              {Math.round(progress)}%
             </span>
           </div>
-          <Progress value={progress} />
+          <Progress value={progress} className="h-2" />
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>{project.done_count} 已完成</span>
+            <span>{project.item_count} 总计</span>
+          </div>
         </div>
 
         {/* Datasets */}
-        <div className="space-y-2">
+        <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Datasets ({project.dataset_count})</span>
-            <Button variant="ghost" size="sm" onClick={onAddDataset}>
-              <Plus className="w-3 h-3 mr-1" /> Add
+            <span className="text-muted-foreground font-medium text-xs uppercase tracking-wider">
+              数据集
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs hover:bg-primary/10 hover:text-primary"
+              onClick={(e) => {
+                e.stopPropagation()
+                onAddDataset()
+              }}
+            >
+              <Plus className="w-3 h-3 mr-1" /> 添加
             </Button>
           </div>
-          {datasets?.slice(0, 3).map((dataset) => (
-            <DatasetItem key={dataset.id} dataset={dataset} projectId={project.id} />
-          ))}
-          {(!datasets || datasets.length === 0) && (
-            <p className="text-sm text-muted-foreground text-center py-2">No datasets yet</p>
-          )}
+          <div className="space-y-1">
+            {(isExpanded ? datasets : datasets?.slice(0, 2))?.map((dataset) => (
+              <DatasetItem key={dataset.id} dataset={dataset} projectId={project.id} />
+            ))}
+            {datasets && datasets.length > 2 && (
+               <button
+                 onClick={() => setIsExpanded(!isExpanded)}
+                 className="pl-9 text-xs text-muted-foreground flex items-center gap-1 hover:text-primary transition-colors mt-1"
+               >
+                 {isExpanded ? (
+                   <>
+                     <ChevronUp className="w-3 h-3" />
+                     收起
+                   </>
+                 ) : (
+                   <>
+                     <MoreHorizontal className="w-3 h-3" />
+                     还有 {datasets.length - 2} 个数据集
+                   </>
+                 )}
+               </button>
+            )}
+            {(!datasets || datasets.length === 0) && (
+              <div className="flex flex-col items-center justify-center py-4 border-2 border-dashed rounded-lg bg-muted/20">
+                <ImageIcon className="w-8 h-8 text-muted-foreground/30 mb-1" />
+                <p className="text-xs text-muted-foreground">暂无数据集</p>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Actions */}
         <div className="flex gap-2 pt-2">
           <Button
-            variant="outline"
+            variant="default"
             size="sm"
-            className="flex-1"
+            className="flex-1 bg-primary/90 hover:bg-primary shadow-sm"
             onClick={() => (window.location.href = `/projects/${project.id}/dashboard`)}
           >
-            <BarChart3 className="w-3 h-3 mr-1" /> Dashboard
+            <BarChart3 className="w-3.5 h-3.5 mr-1.5" /> 统计看板
           </Button>
-          <Button variant="outline" size="sm" className="flex-1" onClick={onDelete}>
-            <Trash2 className="w-3 h-3 mr-1" /> Delete
+          <Button
+            variant="outline"
+            size="sm"
+            className="px-3 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30"
+            onClick={onDelete}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
           </Button>
         </div>
       </CardContent>
@@ -420,18 +535,22 @@ function DatasetItem({ dataset, projectId }: { dataset: Dataset; projectId: numb
   return (
     <Link
       to={`/projects/${projectId}/datasets/${dataset.id}`}
-      className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted transition-colors"
+      className="flex items-center gap-3 p-2 rounded-md hover:bg-muted/80 transition-colors group"
     >
-      <div className="w-8 h-8 rounded bg-muted flex items-center justify-center">
-        <ImageIcon className="w-4 h-4 text-muted-foreground" />
+      <div className="w-8 h-8 rounded bg-background border flex items-center justify-center shadow-sm group-hover:border-primary/30 transition-colors">
+        <FolderOpen className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">{dataset.name}</p>
-        <p className="text-xs text-muted-foreground">
-          {dataset.done_count}/{dataset.item_count} · {Math.round(progress)}%
-        </p>
+        <div className="flex items-center justify-between mb-0.5">
+          <p className="text-sm font-medium truncate leading-none">{dataset.name}</p>
+          <span className="text-[10px] text-muted-foreground bg-muted px-1 rounded">
+             {Math.round(progress)}%
+          </span>
+        </div>
+        <div className="w-full h-1 bg-muted rounded-full overflow-hidden">
+           <div className="h-full bg-primary/60" style={{ width: `${progress}%` }} />
+        </div>
       </div>
     </Link>
   )
 }
-

@@ -9,10 +9,8 @@ import {
   Loader2,
   ChevronRight,
   ChevronLeft,
-  Keyboard,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import {
   Dialog,
@@ -35,6 +33,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { itemsApi, projectsApi, type Label as LabelType } from '@/lib/api'
@@ -104,7 +103,7 @@ export default function AnnotatePage() {
       refetchNextItem()
     },
     onError: () => {
-      toast({ title: 'Error', description: 'Failed to save annotation', variant: 'destructive' })
+      toast({ title: '错误', description: '无法保存标注', variant: 'destructive' })
     },
   })
 
@@ -117,7 +116,7 @@ export default function AnnotatePage() {
       setSkipDialogOpen(false)
       setSkipReason('')
       refetchNextItem()
-      toast({ title: 'Skipped', description: 'Item has been skipped' })
+      toast({ title: '已跳过', description: '该图片已标记为跳过' })
     },
   })
 
@@ -128,7 +127,7 @@ export default function AnnotatePage() {
       queryClient.invalidateQueries({ queryKey: ['items', datasetId] })
       setDeleteDialogOpen(false)
       refetchNextItem()
-      toast({ title: 'Deleted', description: 'Item has been deleted' })
+      toast({ title: '已删除', description: '图片已删除' })
     },
   })
 
@@ -139,7 +138,7 @@ export default function AnnotatePage() {
     try {
       const prevItem = await itemsApi.getPrevious(item.id)
       if (!prevItem) {
-        toast({ title: 'No previous item', description: 'This is the first item' })
+        toast({ title: '没有上一张', description: '这是第一张图片' })
         return
       }
       
@@ -149,7 +148,7 @@ export default function AnnotatePage() {
       }))
       setSelectedLabel(null)
     } catch {
-      toast({ title: 'No previous item', description: 'This is the first item' })
+      toast({ title: '没有上一张', description: '这是第一张图片' })
     }
   }, [item, datasetId, queryClient, nextItemData, toast])
 
@@ -160,15 +159,15 @@ export default function AnnotatePage() {
     try {
       const nextItem = await itemsApi.getNextByOrder(item.id)
       if (!nextItem) {
-        toast({ title: 'No next item', description: 'This is the last item' })
+        toast({ title: '没有下一张', description: '这是最后一张图片' })
         return
       }
       
       // Check if next item is unprocessed (todo)
       if (nextItem.status === 'todo') {
         toast({ 
-          title: 'Cannot skip forward', 
-          description: 'Please use Submit or Skip to proceed to unannotated items',
+          title: '无法跳转', 
+          description: '请使用“提交”或“跳过”来处理当前图片',
           variant: 'default'
         })
         return
@@ -180,7 +179,7 @@ export default function AnnotatePage() {
       }))
       setSelectedLabel(null)
     } catch {
-      toast({ title: 'Error', description: 'Failed to load next item', variant: 'destructive' })
+      toast({ title: '错误', description: '无法加载下一张', variant: 'destructive' })
     }
   }, [item, datasetId, queryClient, nextItemData, toast])
 
@@ -280,19 +279,17 @@ export default function AnnotatePage() {
           <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-6">
             <Check className="w-10 h-10 text-green-600" />
           </div>
-          <h1 className="text-2xl font-bold mb-2">All Done!</h1>
-          <p className="text-muted-foreground mb-6">
-            You've completed all items in this dataset. Great work!
-          </p>
+          <h1 className="text-2xl font-bold mb-2">全部完成</h1>
+          <p className="text-muted-foreground mb-6">你已完成该数据集所有标注任务。</p>
           <div className="flex gap-4 justify-center">
             <Link to={`/projects/${projectId}/datasets/${datasetId}`}>
               <Button variant="outline">
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Dataset
+                返回数据集
               </Button>
             </Link>
             <Link to="/projects">
-              <Button>View All Projects</Button>
+              <Button>查看项目列表</Button>
             </Link>
           </div>
         </div>
@@ -301,29 +298,42 @@ export default function AnnotatePage() {
   }
 
   return (
-    <div className="flex flex-col h-full bg-muted/30">
+    <div className="flex flex-col h-full bg-gradient-to-b from-background to-muted/30">
       {/* Header */}
-      <header className="flex items-center gap-4 px-6 py-3 bg-card border-b">
-        <Link to={`/projects/${projectId}/datasets/${datasetId}`}>
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-        </Link>
-
-        <div className="flex-1">
-          <div className="flex items-center gap-4">
-            <div className="flex-1 max-w-md">
-              <Progress value={progress} className="h-2" />
+      <header className="sticky top-0 z-10 flex items-center justify-between px-6 py-3 bg-card/80 backdrop-blur supports-[backdrop-filter]:bg-card/60 border-b shadow-sm">
+        <div className="flex items-center gap-4">
+          <Link to={`/projects/${projectId}/datasets/${datasetId}`}>
+            <Button variant="ghost" size="icon" className="-ml-2 hover:bg-muted/80">
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+          </Link>
+          
+          <div className="flex flex-col">
+            <h1 className="font-semibold text-sm leading-none">{project?.name || '标注任务'}</h1>
+            <div className="flex items-center gap-2 mt-1">
+               <span className="text-xs text-muted-foreground">标注进度</span>
+               <span className={cn("text-xs font-medium", progress === 100 ? "text-green-600" : "text-primary")}>
+                {Math.round(progress)}%
+              </span>
             </div>
-            <span className="text-sm text-muted-foreground whitespace-nowrap">
-              {nextItemData?.done_count ?? 0} / {nextItemData?.total_count ?? 0} ({Math.round(progress)}
-              %)
-            </span>
           </div>
         </div>
 
-        <div className="text-sm text-muted-foreground">
-          {nextItemData?.remaining_count ?? 0} remaining
+        <div className="flex-1 max-w-md px-8 flex flex-col justify-center gap-1.5">
+           <Progress value={progress} className="h-2 w-full" />
+           <div className="flex justify-between text-[10px] text-muted-foreground font-medium px-0.5">
+              <span>{nextItemData?.done_count ?? 0} 完成</span>
+              <span>{nextItemData?.total_count ?? 0} 总计</span>
+           </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 rounded-md border border-border/50">
+            <span className="text-xs text-muted-foreground font-medium">剩余</span>
+            <Badge variant="secondary" className="font-mono font-bold text-xs bg-background shadow-sm border-0">
+              {nextItemData?.remaining_count ?? 0}
+            </Badge>
+          </div>
         </div>
       </header>
 
@@ -345,119 +355,121 @@ export default function AnnotatePage() {
         ) : null}
 
         {/* Sidebar */}
-        <aside className="w-80 bg-card border-l flex flex-col">
+        <aside className="w-80 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-l flex flex-col shadow-xl z-20">
           {/* File info */}
-          <div className="p-4 border-b">
-            <h3 className="font-medium truncate">{item?.filename ?? 'Loading...'}</h3>
-            <p className="text-sm text-muted-foreground truncate">{item?.rel_path}</p>
+          <div className="p-4 border-b bg-muted/10">
+            <h3 className="font-medium truncate text-sm" title={item?.filename}>
+              {item?.filename ?? 'Loading...'}
+            </h3>
+            <p className="text-xs text-muted-foreground truncate font-mono mt-1 opacity-70">
+              {item?.rel_path}
+            </p>
             {item?.width && item?.height && (
-              <p className="text-xs text-muted-foreground mt-1">
-                {item.width} × {item.height}
-              </p>
+              <Badge variant="outline" className="mt-2 text-[10px] h-5 font-normal text-muted-foreground">
+                {item.width} × {item.height} px
+              </Badge>
             )}
           </div>
 
           {/* Labels */}
-          <div className="flex-1 overflow-auto p-4">
-            <h4 className="text-sm font-medium mb-3">Select Label</h4>
+          <div className="flex-1 overflow-auto p-4 custom-scrollbar">
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+              选择标签
+            </h4>
             <div className="space-y-2">
               {labels.map((label, index) => (
                 <button
                   key={label.id}
                   onClick={() => handleSelectLabel(label)}
                   className={cn(
-                    'w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-all text-left',
+                    'w-full flex items-center gap-3 p-3 rounded-md border transition-all text-left relative overflow-hidden group',
                     selectedLabel === label.name
-                      ? 'border-primary bg-primary/5'
-                      : 'border-transparent bg-muted/50 hover:bg-muted'
+                      ? 'border-primary bg-primary/10 shadow-sm'
+                      : 'border-transparent bg-muted/40 hover:bg-muted hover:border-border'
                   )}
                 >
-                  <kbd className="w-6 h-6 flex items-center justify-center text-xs bg-background rounded">
+                  <div className={cn(
+                    "absolute left-0 top-0 bottom-0 w-1 transition-colors",
+                    selectedLabel === label.name ? "bg-primary" : "bg-transparent group-hover:bg-muted-foreground/20"
+                  )} />
+                  <kbd className="min-w-[1.5rem] h-6 flex items-center justify-center text-[10px] bg-background border rounded text-muted-foreground font-mono">
                     {index + 1}
                   </kbd>
+                  <span className="flex-1 font-medium text-sm truncate">{label.name}</span>
                   <div
-                    className="w-4 h-4 rounded-full border"
+                    className="w-3 h-3 rounded-full shadow-sm"
                     style={{ backgroundColor: label.color }}
                   />
-                  <span className="flex-1 font-medium">{label.name}</span>
-                  {selectedLabel === label.name && <Check className="w-4 h-4 text-primary" />}
                 </button>
               ))}
             </div>
           </div>
 
           {/* Actions */}
-          <div className="p-4 border-t space-y-3">
-            {/* Navigation buttons */}
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1"
-                onClick={goToPreviousItem}
-                title="Previous (←)"
-              >
-                <ChevronLeft className="w-4 h-4 mr-1" />
-                Previous
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1"
-                onClick={goToNextItem}
-                title="Next (→)"
-              >
-                Next
-                <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
-            </div>
-
+          <div className="p-4 border-t space-y-3 bg-muted/10 mt-auto">
+            {/* Submit Button */}
             <Button
-              className="w-full"
+              className="w-full h-11 text-base shadow-sm font-medium"
               size="lg"
               onClick={handleSubmit}
               disabled={!selectedLabel || classifyMutation.isPending}
             >
               {classifyMutation.isPending ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
               ) : (
-                <Check className="w-4 h-4 mr-2" />
+                <Check className="w-5 h-5 mr-2" />
               )}
               Submit & Next
-              <kbd className="ml-auto text-xs opacity-70">Enter</kbd>
             </Button>
 
-            <div className="flex gap-2">
+            {/* Secondary Actions */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full h-9"
+              onClick={() => setSkipDialogOpen(true)}
+              disabled={!item}
+            >
+              <SkipForward className="w-3.5 h-3.5 mr-1.5" />
+              Skip
+            </Button>
+
+            {/* Navigation & Delete */}
+            <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/50">
               <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => setSkipDialogOpen(true)}
-                disabled={!item}
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs text-muted-foreground hover:text-foreground"
+                onClick={goToPreviousItem}
+                title="Previous (←)"
               >
-                <SkipForward className="w-4 h-4 mr-1" />
-                Skip
-                <kbd className="ml-auto text-xs opacity-70">S</kbd>
+                <ChevronLeft className="w-3.5 h-3.5 mr-1" />
+                Prev
               </Button>
+              
               <Button
-                variant="outline"
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs text-destructive/70 hover:text-destructive hover:bg-destructive/10"
                 onClick={() => setDeleteDialogOpen(true)}
                 disabled={!item}
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                Delete Image
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs text-muted-foreground hover:text-foreground"
+                onClick={goToNextItem}
+                title="Next (→)"
+              >
+                Next
+                <ChevronRight className="w-3.5 h-3.5 ml-1" />
               </Button>
             </div>
           </div>
-
-          {/* Shortcuts hint */}
-          <Card className="m-4 mt-0 p-3 bg-muted/50">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Keyboard className="w-4 h-4" />
-              <div className="flex flex-col gap-1">
-                <span>1-9: Label | Enter: Submit | S: Skip</span>
-                <span>←/→: Prev/Next | Scroll: Zoom | Space+Drag: Pan</span>
-              </div>
-            </div>
-          </Card>
         </aside>
       </div>
 
@@ -465,16 +477,14 @@ export default function AnnotatePage() {
       <Dialog open={skipDialogOpen} onOpenChange={setSkipDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Skip this item?</DialogTitle>
-            <DialogDescription>
-              Please provide a reason for skipping this item.
-            </DialogDescription>
+            <DialogTitle>跳过该图片？</DialogTitle>
+            <DialogDescription>请输入跳过原因，该图片将标记为“已跳过”。</DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <Label htmlFor="skip-reason">Reason</Label>
+            <Label htmlFor="skip-reason">原因</Label>
             <Input
               id="skip-reason"
-              placeholder="e.g., Image is blurry, Cannot identify subject..."
+              placeholder="例如：图片模糊 / 无法辨识主体…"
               value={skipReason}
               onChange={(e) => setSkipReason(e.target.value)}
               autoFocus
@@ -482,13 +492,13 @@ export default function AnnotatePage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setSkipDialogOpen(false)}>
-              Cancel
+              取消
             </Button>
             <Button
               onClick={() => item && skipMutation.mutate({ itemId: item.id, reason: skipReason })}
               disabled={!skipReason.trim() || skipMutation.isPending}
             >
-              {skipMutation.isPending ? 'Skipping...' : 'Skip Item'}
+              {skipMutation.isPending ? '跳过中...' : '确认跳过'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -498,18 +508,18 @@ export default function AnnotatePage() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this item?</AlertDialogTitle>
+            <AlertDialogTitle>确认删除该图片？</AlertDialogTitle>
             <AlertDialogDescription>
-              This will mark the item as deleted. You can restore it later if needed.
+              此操作将标记该图片为已删除。您稍后可以在回收站中恢复（如果支持）。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => item && deleteMutation.mutate(item.id)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+              {deleteMutation.isPending ? '删除中...' : '确认删除'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -517,4 +527,3 @@ export default function AnnotatePage() {
     </div>
   )
 }
-

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useVirtualizer } from '@tanstack/react-virtual'
@@ -39,16 +39,17 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { datasetsApi, itemsApi, projectsApi, type Item } from '@/lib/api'
+import { useElementSize } from '@/hooks/use-element-size'
 
 type ViewMode = 'grid' | 'list'
 type StatusFilter = 'all' | 'todo' | 'done' | 'skipped'
 
 const statusConfig = {
-  todo: { label: 'To Do', icon: Clock, color: 'text-yellow-500' },
-  in_progress: { label: 'In Progress', icon: Clock, color: 'text-blue-500' },
-  done: { label: 'Done', icon: CheckCircle2, color: 'text-green-500' },
-  skipped: { label: 'Skipped', icon: Ban, color: 'text-orange-500' },
-  deleted: { label: 'Deleted', icon: Ban, color: 'text-red-500' },
+  todo: { label: '待标注', icon: Clock, color: 'text-yellow-600', badge: 'bg-yellow-500/10' },
+  in_progress: { label: '进行中', icon: Clock, color: 'text-blue-600', badge: 'bg-blue-500/10' },
+  done: { label: '已完成', icon: CheckCircle2, color: 'text-green-600', badge: 'bg-green-500/10' },
+  skipped: { label: '已跳过', icon: Ban, color: 'text-orange-600', badge: 'bg-orange-500/10' },
+  deleted: { label: '已删除', icon: Ban, color: 'text-red-600', badge: 'bg-red-500/10' },
 }
 
 export default function DatasetPage() {
@@ -61,6 +62,7 @@ export default function DatasetPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [page, setPage] = useState(1)
   const parentRef = useRef<HTMLDivElement>(null)
+  const { width: scrollWidth } = useElementSize(parentRef)
   
   // Export dialog state
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
@@ -94,14 +96,15 @@ export default function DatasetPage() {
   const items = itemsData?.items || []
   
   // 虚拟列表配置 - 按行虚拟化
-  // 根据视图模式确定列数（使用固定列数避免响应式问题）
-  const getColumnCount = () => {
+  // Grid 列数随容器宽度自适应（不牺牲虚拟滚动性能）
+  const columnCount = useMemo(() => {
     if (viewMode === 'list') return 1
-    // Grid模式：使用固定6列，简化高度计算
+    const w = scrollWidth || 1200
+    if (w < 560) return 2
+    if (w < 900) return 3
+    if (w < 1200) return 4
     return 6
-  }
-  
-  const columnCount = getColumnCount()
+  }, [scrollWidth, viewMode])
   const rowCount = Math.ceil(items.length / columnCount)
 
   // 动态计算行高：宁可高估也不重叠
@@ -109,11 +112,14 @@ export default function DatasetPage() {
     if (viewMode === 'list') {
       return 88 // list模式：固定高度
     }
-    // Grid模式：图片是aspect-square，按容器宽度计算
-    // 假设容器宽度约1200px，6列，gap-4(16px)
-    // 每列宽度 ≈ (1200 - 5*16) / 6 ≈ 186px
-    // 加上gap约202px，为安全起见用250px
-    return 250
+    // Grid模式：图片是aspect-square，按容器宽度粗略估算
+    const w = scrollWidth || 1200
+    const padding = 48 // p-6
+    const gap = 16 // gap-4
+    const usable = Math.max(w - padding, 320)
+    const cell = (usable - (columnCount - 1) * gap) / columnCount
+    // badge/hover 等额外高度，稍微高估避免重叠
+    return Math.ceil(cell + 24)
   }
 
   const rowVirtualizer = useVirtualizer({
@@ -123,18 +129,23 @@ export default function DatasetPage() {
     overscan: 2,
   })
 
+  // 当列数或容器大小变化时，强制重新测量
+  useEffect(() => {
+    rowVirtualizer.measure()
+  }, [columnCount, scrollWidth, viewMode, rowVirtualizer])
+
   const scanMutation = useMutation({
     mutationFn: () => datasetsApi.scan(Number(datasetId)),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['items', datasetId] })
       queryClient.invalidateQueries({ queryKey: ['dataset', datasetId] })
       toast({
-        title: 'Scan complete',
-        description: `Added ${result.added_count} new images. Total: ${result.total_count}`,
+        title: '扫描完成',
+        description: `添加了 ${result.added_count} 张新图片。总计: ${result.total_count}`,
       })
     },
     onError: () => {
-      toast({ title: 'Scan failed', variant: 'destructive' })
+      toast({ title: '扫描失败', variant: 'destructive' })
     },
   })
 
@@ -177,9 +188,9 @@ export default function DatasetPage() {
   })
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-gradient-to-b from-background to-muted/30">
       {/* Header */}
-      <header className="border-b bg-card px-6 py-4">
+      <header className="sticky top-0 z-10 border-b bg-card/80 backdrop-blur supports-[backdrop-filter]:bg-card/60 px-6 py-4">
         <div className="flex items-center gap-4 mb-4">
           <Link to="/projects">
             <Button variant="ghost" size="icon">
@@ -193,20 +204,16 @@ export default function DatasetPage() {
             </div>
             <h1 className="text-2xl font-bold">{dataset?.name || 'Dataset'}</h1>
           </div>
-          <Button
-            variant="outline"
-            onClick={() => scanMutation.mutate()}
-            disabled={scanMutation.isPending}
-          >
+          <Button variant="outline" onClick={() => scanMutation.mutate()} disabled={scanMutation.isPending}>
             <RefreshCw className={cn('w-4 h-4 mr-2', scanMutation.isPending && 'animate-spin')} />
-            Rescan
+            重新扫描
           </Button>
           <Button
             variant="outline"
             onClick={() => navigate(`/projects/${projectId}/datasets/${datasetId}/import`)}
           >
             <Upload className="w-4 h-4 mr-2" />
-            Import
+            导入
           </Button>
           <Button
             variant="outline"
@@ -214,34 +221,54 @@ export default function DatasetPage() {
             disabled={!dataset || dataset.done_count === 0}
           >
             <Download className="w-4 h-4 mr-2" />
-            Export
+            导出
           </Button>
           <Button onClick={handleStartAnnotation} disabled={!dataset || dataset.todo_count === 0}>
             <Play className="w-4 h-4 mr-2" />
-            Start Annotation
+            开始标注
           </Button>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-4 gap-4">
-          <Card className="p-4">
-            <div className="text-sm text-muted-foreground">Total</div>
-            <div className="text-2xl font-bold">{dataset?.item_count ?? 0}</div>
-          </Card>
-          <Card className="p-4">
-            <div className="text-sm text-muted-foreground">To Do</div>
-            <div className="text-2xl font-bold text-yellow-600">{dataset?.todo_count ?? 0}</div>
-          </Card>
-          <Card className="p-4">
-            <div className="text-sm text-muted-foreground">Done</div>
-            <div className="text-2xl font-bold text-green-600">{dataset?.done_count ?? 0}</div>
-          </Card>
-          <Card className="p-4">
-            <div className="text-sm text-muted-foreground">Progress</div>
-            <div className="flex items-center gap-2">
-              <Progress value={progress} className="flex-1" />
-              <span className="text-sm font-medium">{Math.round(progress)}%</span>
+        {/* Stats Bar */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+          <Card className="md:col-span-8 p-1 flex items-center justify-between bg-card/50">
+            <div className="flex-1 flex items-center justify-center gap-3 py-3 border-r border-border/50">
+              <div className="h-10 w-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-600">
+                <ImageIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold leading-none tracking-tight text-blue-700">{dataset?.item_count ?? 0}</div>
+                <div className="text-xs text-muted-foreground font-medium mt-1">总图片</div>
+              </div>
             </div>
+            
+            <div className="flex-1 flex items-center justify-center gap-3 py-3 border-r border-border/50">
+              <div className="h-10 w-10 rounded-xl bg-yellow-500/10 flex items-center justify-center text-yellow-600">
+                <Clock className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold leading-none tracking-tight text-yellow-700">{dataset?.todo_count ?? 0}</div>
+                <div className="text-xs text-muted-foreground font-medium mt-1">待标注</div>
+              </div>
+            </div>
+
+            <div className="flex-1 flex items-center justify-center gap-3 py-3">
+              <div className="h-10 w-10 rounded-xl bg-green-500/10 flex items-center justify-center text-green-600">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold leading-none tracking-tight text-green-700">{dataset?.done_count ?? 0}</div>
+                <div className="text-xs text-muted-foreground font-medium mt-1">已完成</div>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="md:col-span-4 p-4 flex flex-col justify-center bg-card/50">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-muted-foreground">标注进度</span>
+              <span className="text-xl font-bold text-primary">{Math.round(progress)}%</span>
+            </div>
+            <Progress value={progress} className="h-2" />
           </Card>
         </div>
       </header>
@@ -260,7 +287,7 @@ export default function DatasetPage() {
                 setPage(1)
               }}
             >
-              {status === 'all' ? 'All' : statusConfig[status].label}
+              {status === 'all' ? '全部' : statusConfig[status].label}
             </Button>
           ))}
         </div>
@@ -292,7 +319,10 @@ export default function DatasetPage() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <div ref={parentRef} className="flex-1 overflow-auto p-6">
           {itemsLoading ? (
-            <div className={cn('grid gap-4', viewMode === 'grid' ? 'grid-cols-6' : 'grid-cols-1')}>
+            <div
+              className={cn('grid gap-4', viewMode === 'list' ? 'grid-cols-1' : '')}
+              style={viewMode === 'grid' ? { gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` } : undefined}
+            >
               {Array.from({ length: 12 }).map((_, i) => (
                 <Skeleton key={i} className={viewMode === 'grid' ? 'aspect-square' : 'h-16'} />
               ))}
@@ -300,16 +330,16 @@ export default function DatasetPage() {
           ) : items.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-64 text-center">
               <ImageIcon className="w-16 h-16 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">No images found</h3>
+              <h3 className="text-lg font-medium mb-2">没有找到图片</h3>
               <p className="text-muted-foreground mb-4">
                 {statusFilter === 'all'
-                  ? 'Scan the dataset to import images'
-                  : `No ${statusFilter} images in this dataset`}
+                  ? '请先扫描数据集以加载图片'
+                  : `当前筛选下没有${statusConfig[statusFilter as Exclude<StatusFilter, 'all'>].label}的图片`}
               </p>
               {statusFilter === 'all' && (
                 <Button onClick={() => scanMutation.mutate()}>
                   <RefreshCw className="w-4 h-4 mr-2" />
-                  Scan Now
+                  立即扫描
                 </Button>
               )}
             </div>
@@ -340,7 +370,10 @@ export default function DatasetPage() {
                     }}
                   >
                     {viewMode === 'grid' ? (
-                      <div className="grid grid-cols-6 gap-4">
+                      <div
+                        className="grid gap-4"
+                        style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }}
+                      >
                         {rowItems.map((item) => (
                           <ImageCard key={item.id} item={item} />
                         ))}
@@ -369,10 +402,10 @@ export default function DatasetPage() {
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}
               >
-                Previous
+                上一页
               </Button>
               <span className="text-sm text-muted-foreground">
-                Page {page} of {itemsData.total_pages}
+                第 {page} 页 / 共 {itemsData.total_pages} 页
               </span>
               <Button
                 variant="outline"
@@ -380,7 +413,7 @@ export default function DatasetPage() {
                 onClick={() => setPage((p) => Math.min(itemsData.total_pages, p + 1))}
                 disabled={page === itemsData.total_pages}
               >
-                Next
+                下一页
               </Button>
             </div>
           </div>
@@ -410,7 +443,7 @@ function ImageCard({ item }: { item: Item }) {
   const Icon = config.icon
 
   return (
-    <div className="group relative aspect-square rounded-lg overflow-hidden bg-muted border">
+    <div className="group relative aspect-square rounded-xl overflow-hidden bg-muted border shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md hover:border-primary/30">
       {!loaded && <div className="skeleton absolute inset-0" />}
       <img
         src={item.thumb_url}
