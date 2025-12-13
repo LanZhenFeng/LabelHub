@@ -30,6 +30,7 @@ interface UserState {
   setUser: (user: User) => void
   setTokens: (access: string, refresh: string) => void
   clearAuth: () => void
+  logout: () => void // M4: Alias for clearAuth
 
   // Computed
   isAuthenticated: () => boolean
@@ -53,6 +54,11 @@ export const useUserStore = create<UserState>()(
 
       clearAuth: () =>
         set({ user: null, accessToken: null, refreshToken: null }),
+
+      logout: () => {
+        // M4: Clear auth and optionally call logout API
+        set({ user: null, accessToken: null, refreshToken: null })
+      },
 
       // Computed
       isAuthenticated: () => {

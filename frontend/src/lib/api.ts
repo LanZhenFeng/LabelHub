@@ -7,6 +7,69 @@ const api = axios.create({
   },
 })
 
+// M4: Setup authentication interceptors
+export function setupAuthInterceptors(
+  getAccessToken: () => string | null,
+  getRefreshToken: () => string | null,
+  setTokens: (access: string, refresh: string) => void,
+  clearAuth: () => void
+) {
+  // Request interceptor: Add access token to headers
+  api.interceptors.request.use(
+    (config) => {
+      const accessToken = getAccessToken()
+      if (accessToken) {
+        config.headers.Authorization = `Bearer ${accessToken}`
+      }
+      return config
+    },
+    (error) => Promise.reject(error)
+  )
+
+  // Response interceptor: Handle 401 and refresh token
+  api.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+      const originalRequest = error.config
+      const refreshToken = getRefreshToken()
+
+      // If 401 and not already retrying, and not a refresh/login request
+      if (
+        error.response?.status === 401 &&
+        !originalRequest._retry &&
+        refreshToken &&
+        !originalRequest.url?.includes('/auth/refresh') &&
+        !originalRequest.url?.includes('/auth/login')
+      ) {
+        originalRequest._retry = true
+
+        try {
+          // Try to refresh the token
+          const response = await axios.post('/api/v1/auth/refresh', {
+            refresh_token: refreshToken,
+          })
+          
+          const { access_token, refresh_token } = response.data
+          setTokens(access_token, refresh_token)
+
+          // Retry the original request with new token
+          originalRequest.headers.Authorization = `Bearer ${access_token}`
+          return api(originalRequest)
+        } catch (refreshError) {
+          // Refresh failed, clear auth and redirect to login
+          clearAuth()
+          if (typeof window !== 'undefined') {
+            window.location.href = '/login'
+          }
+          return Promise.reject(refreshError)
+        }
+      }
+
+      return Promise.reject(error)
+    }
+  )
+}
+
 // Types
 export interface Label {
   id: number
@@ -462,102 +525,6 @@ export const usersApi = {
     api.put<User>(`/users/${id}/role`, { role }).then((r) => r.data),
 
   delete: (id: number) => api.delete(`/users/${id}`),
-}
-
-// ============= Axios Interceptors for JWT =============
-// Note: This will be configured in main.tsx after userStore is available
-
-export function setupAuthInterceptors(
-  getAccessToken: () => string | null,
-  getRefreshToken: () => string | null,
-  setTokens: (access: string, refresh: string) => void,
-  clearAuth: () => void
-) {
-  // Request interceptor: Add JWT token to headers
-  api.interceptors.request.use(
-    (config) => {
-      const token = getAccessToken()
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`
-      }
-      return config
-    },
-    (error) => Promise.reject(error)
-  )
-
-  // Response interceptor: Handle 401 and auto-refresh token
-  let isRefreshing = false
-  let failedQueue: Array<{
-    resolve: (value?: unknown) => void
-    reject: (reason?: unknown) => void
-  }> = []
-
-  const processQueue = (error: unknown = null) => {
-    failedQueue.forEach((prom) => {
-      if (error) {
-        prom.reject(error)
-      } else {
-        prom.resolve()
-      }
-    })
-    failedQueue = []
-  }
-
-  api.interceptors.response.use(
-    (response) => response,
-    async (error) => {
-      const originalRequest = error.config
-
-      // If error is not 401 or already retried, reject
-      if (error.response?.status !== 401 || originalRequest._retry) {
-        return Promise.reject(error)
-      }
-
-      // If currently refreshing, queue the request
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject })
-        })
-          .then(() => api(originalRequest))
-          .catch((err) => Promise.reject(err))
-      }
-
-      originalRequest._retry = true
-      isRefreshing = true
-
-      const refreshToken = getRefreshToken()
-
-      if (!refreshToken) {
-        // No refresh token, clear auth and redirect to login
-        clearAuth()
-        window.location.href = '/login'
-        return Promise.reject(error)
-      }
-
-      try {
-        // Try to refresh the token
-        const { access_token } = await authApi.refresh(refreshToken)
-        setTokens(access_token, refreshToken)
-
-        // Update the failed request's auth header
-        originalRequest.headers.Authorization = `Bearer ${access_token}`
-
-        // Process queued requests
-        processQueue()
-        isRefreshing = false
-
-        // Retry the original request
-        return api(originalRequest)
-      } catch (refreshError) {
-        // Refresh failed, clear auth and redirect to login
-        processQueue(refreshError)
-        clearAuth()
-        window.location.href = '/login'
-        isRefreshing = false
-        return Promise.reject(refreshError)
-      }
-    }
-  )
 }
 
 export default api
