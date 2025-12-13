@@ -13,7 +13,7 @@ from app.schemas.parser_template import (
     ParseTestRequest,
     ParseTestResponse,
 )
-from app.services.parser import parse_json_data, parse_jsonl_stream
+from app.services.parser import ParserService
 
 router = APIRouter()
 
@@ -181,22 +181,44 @@ async def test_template(
     predictions = []
     
     try:
-        if template_config["input_type"] == "jsonl":
-            results = parse_jsonl_stream(
-                test_request.sample_data.encode(template_config["input_encoding"]),
-                template_config["mapping"],
-                max_records=test_request.max_records,
-            )
-        else:  # json
-            results = parse_json_data(
-                test_request.sample_data,
-                template_config["mapping"],
-                record_path=template_config["record_path"],
-                max_records=test_request.max_records,
-            )
+        # Initialize parser service
+        parser = ParserService(template_config)
         
-        predictions = results["predictions"]
-        errors = results["errors"]
+        # Parse based on input type
+        if template_config["input_type"] == "jsonl":
+            # Parse JSONL line by line
+            lines = test_request.sample_data.strip().split('\n')
+            for idx, line in enumerate(lines[:test_request.max_records]):
+                if not line.strip():
+                    continue
+                try:
+                    record = parser.parse_record(line)
+                    if record:
+                        predictions.append(record)
+                except Exception as e:
+                    errors.append({"line": idx + 1, "error": str(e)})
+        else:  # json
+            # Parse JSON
+            import json
+            data = json.loads(test_request.sample_data)
+            
+            # Extract records based on record_path
+            if template_config["record_path"]:
+                import jmespath
+                records = jmespath.search(template_config["record_path"], data)
+                if not isinstance(records, list):
+                    records = [records] if records else []
+            else:
+                records = [data] if isinstance(data, dict) else data
+            
+            # Parse each record
+            for idx, record in enumerate(records[:test_request.max_records]):
+                try:
+                    parsed = parser.parse_record(record)
+                    if parsed:
+                        predictions.append(parsed)
+                except Exception as e:
+                    errors.append({"line": idx + 1, "error": str(e)})
         
     except Exception as e:
         errors.append({"error": f"Parse failed: {str(e)}"})
