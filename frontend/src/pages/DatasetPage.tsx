@@ -13,11 +13,29 @@ import {
   Clock,
   Ban,
   Upload,
+  Download,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Progress } from '@/components/ui/progress'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { datasetsApi, itemsApi, projectsApi, type Item } from '@/lib/api'
@@ -43,6 +61,11 @@ export default function DatasetPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [page, setPage] = useState(1)
   const parentRef = useRef<HTMLDivElement>(null)
+  
+  // Export dialog state
+  const [exportDialogOpen, setExportDialogOpen] = useState(false)
+  const [exportFormat, setExportFormat] = useState<'coco' | 'yolo' | 'voc'>('coco')
+  const [includeImages, setIncludeImages] = useState(false)
 
   const { data: project } = useQuery({
     queryKey: ['project', projectId],
@@ -121,6 +144,25 @@ export default function DatasetPage() {
     navigate(`/projects/${projectId}/datasets/${datasetId}/annotate`)
   }
 
+  // Export mutation
+  const exportMutation = useMutation({
+    mutationFn: () => datasetsApi.export(Number(datasetId), exportFormat, includeImages),
+    onSuccess: () => {
+      toast({
+        title: '导出成功',
+        description: `已生成 ${exportFormat.toUpperCase()} 格式导出文件`,
+      })
+      setExportDialogOpen(false)
+    },
+    onError: (error: Error) => {
+      toast({
+        title: '导出失败',
+        description: error.message,
+        variant: 'destructive',
+      })
+    },
+  })
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -152,6 +194,14 @@ export default function DatasetPage() {
           >
             <Upload className="w-4 h-4 mr-2" />
             Import
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setExportDialogOpen(true)}
+            disabled={!dataset || dataset.done_count === 0}
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Export
           </Button>
           <Button onClick={handleStartAnnotation} disabled={!dataset || dataset.todo_count === 0}>
             <Play className="w-4 h-4 mr-2" />
@@ -323,6 +373,19 @@ export default function DatasetPage() {
           </div>
         )}
       </div>
+      
+      {/* Export Dialog */}
+      <ExportDialog
+        open={exportDialogOpen}
+        onOpenChange={setExportDialogOpen}
+        format={exportFormat}
+        onFormatChange={setExportFormat}
+        includeImages={includeImages}
+        onIncludeImagesChange={setIncludeImages}
+        onExport={() => exportMutation.mutate()}
+        isExporting={exportMutation.isPending}
+        doneCount={dataset?.done_count ?? 0}
+      />
     </div>
   )
 }
@@ -404,3 +467,96 @@ function ImageRow({ item }: { item: Item }) {
   )
 }
 
+function ExportDialog({
+  open,
+  onOpenChange,
+  format,
+  onFormatChange,
+  includeImages,
+  onIncludeImagesChange,
+  onExport,
+  isExporting,
+  doneCount,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  format: 'coco' | 'yolo' | 'voc'
+  onFormatChange: (format: 'coco' | 'yolo' | 'voc') => void
+  includeImages: boolean
+  onIncludeImagesChange: (checked: boolean) => void
+  onExport: () => void
+  isExporting: boolean
+  doneCount: number
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>导出标注数据</DialogTitle>
+          <DialogDescription>
+            选择导出格式和选项。将导出 {doneCount} 张已完成标注的图片。
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="format">导出格式</Label>
+            <Select value={format} onValueChange={(v) => onFormatChange(v as any)}>
+              <SelectTrigger id="format">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="coco">COCO JSON</SelectItem>
+                <SelectItem value="yolo">YOLO TXT</SelectItem>
+                <SelectItem value="voc">Pascal VOC XML</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {format === 'coco' && 'MS COCO JSON 格式，包含完整标注信息'}
+              {format === 'yolo' && 'YOLO 格式，归一化坐标 + classes.txt'}
+              {format === 'voc' && 'Pascal VOC XML 格式，标准边界框结构'}
+            </p>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="include-images"
+              checked={includeImages}
+              onCheckedChange={onIncludeImagesChange}
+            />
+            <label
+              htmlFor="include-images"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              包含图片文件
+            </label>
+          </div>
+          <p className="text-xs text-muted-foreground pl-6">
+            {includeImages
+              ? '将图片和标注一起打包下载（文件较大）'
+              : '仅下载标注文件'}
+          </p>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isExporting}>
+            取消
+          </Button>
+          <Button onClick={onExport} disabled={isExporting || doneCount === 0}>
+            {isExporting ? (
+              <>
+                <div className="h-4 w-4 mr-2 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                导出中...
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4 mr-2" />
+                导出
+              </>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
