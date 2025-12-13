@@ -5,7 +5,7 @@ from typing import Any
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-from app.core.config import settings
+from app.core.config import get_settings
 
 # 密码哈希上下文（使用bcrypt）
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -52,6 +52,7 @@ class AuthService:
         Returns:
             str: JWT access token
         """
+        settings = get_settings()
         to_encode = data.copy()
         if expires_delta:
             expire = datetime.utcnow() + expires_delta
@@ -75,6 +76,7 @@ class AuthService:
         Returns:
             str: JWT refresh token
         """
+        settings = get_settings()
         to_encode = data.copy()
         expire = datetime.utcnow() + timedelta(days=settings.refresh_token_expire_days)
         to_encode.update({"exp": expire, "iat": datetime.utcnow()})
@@ -96,6 +98,7 @@ class AuthService:
         Raises:
             JWTError: token无效或过期
         """
+        settings = get_settings()
         payload = jwt.decode(
             token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm]
         )
