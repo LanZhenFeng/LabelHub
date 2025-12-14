@@ -23,8 +23,8 @@ router = APIRouter()
 async def create_dataset(
     project_id: int,
     dataset_in: DatasetCreate,
+    admin: AdminUser,  # M4: Only admins can create datasets
     db: AsyncSession = Depends(get_db),
-    admin: AdminUser = Depends(),  # M4: Only admins can create datasets
 ):
     """Create a new dataset in a project (Admin only)."""
     # Verify project exists
@@ -94,8 +94,8 @@ async def get_dataset(
 async def scan_dataset(
     dataset_id: int,
     scan_request: ScanRequest,
+    admin: AdminUser,  # M4: Only admins can scan datasets
     db: AsyncSession = Depends(get_db),
-    admin: AdminUser = Depends(),  # M4: Only admins can scan datasets
 ):
     """Scan server path and import images into dataset (Admin only)."""
     query = select(Dataset).where(Dataset.id == dataset_id)
@@ -116,8 +116,8 @@ async def scan_dataset(
 @router.delete("/datasets/{dataset_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_dataset(
     dataset_id: int,
+    admin: AdminUser,  # M4: Only admins can delete datasets
     db: AsyncSession = Depends(get_db),
-    admin: AdminUser = Depends(),  # M4: Only admins can delete datasets
 ):
     """Delete a dataset (Admin only)."""
     query = select(Dataset).where(Dataset.id == dataset_id)

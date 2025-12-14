@@ -19,8 +19,8 @@ router = APIRouter()
 @router.post("", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
 async def create_project(
     project_in: ProjectCreate,
+    admin: AdminUser,  # M4: Only admins can create projects
     db: AsyncSession = Depends(get_db),
-    admin: AdminUser = Depends(),  # M4: Only admins can create projects
 ):
     """Create a new project with optional labels (Admin only)."""
     project = Project(
@@ -50,8 +50,8 @@ async def create_project(
 
 @router.get("", response_model=list[ProjectResponse])
 async def list_projects(
+    current_user: CurrentUser,  # M4: Require authentication
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),  # M4: Require authentication
 ):
     """List all projects with statistics."""
     # Get projects with labels
@@ -71,8 +71,8 @@ async def list_projects(
 @router.get("/{project_id}", response_model=ProjectResponse)
 async def get_project(
     project_id: int,
+    current_user: CurrentUser,  # M4: Require authentication
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),  # M4: Require authentication
 ):
     """Get a project by ID."""
     query = select(Project).options(selectinload(Project.labels)).where(Project.id == project_id)
@@ -90,8 +90,8 @@ async def get_project(
 async def update_project(
     project_id: int,
     project_in: ProjectUpdate,
+    admin: AdminUser,  # M4: Only admins can update projects
     db: AsyncSession = Depends(get_db),
-    admin: AdminUser = Depends(),  # M4: Only admins can update projects
 ):
     """Update a project (Admin only)."""
     query = select(Project).options(selectinload(Project.labels)).where(Project.id == project_id)
@@ -116,8 +116,8 @@ async def update_project(
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_project(
     project_id: int,
+    admin: AdminUser,  # M4: Only admins can delete projects
     db: AsyncSession = Depends(get_db),
-    admin: AdminUser = Depends(),  # M4: Only admins can delete projects
 ):
     """Delete a project (Admin only)."""
     query = select(Project).where(Project.id == project_id)
