@@ -1,0 +1,2 @@
+"""LabelHub Backend Application."""
+
