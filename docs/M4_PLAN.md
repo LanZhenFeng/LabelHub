@@ -2,7 +2,36 @@
 
 > 版本：v1.1.0-M4  
 > 预计工期：2-3周  
-> 依赖：M3已完成
+> 依赖：M3已完成  
+> **状态：✅ 已完成**
+
+---
+
+## ✅ 完成情况
+
+**实施日期**：2025-12-14
+
+**已实现功能**：
+- ✅ 用户模型和数据库迁移
+- ✅ JWT认证服务（登录/注册/刷新/登出）
+- ✅ 密码哈希（Bcrypt）
+- ✅ 权限中间件和依赖注入（`get_current_user`, `require_role`）
+- ✅ 标注员归属（Item.annotator_id, AnnotationEvent.user_id）
+- ✅ 前端登录/注册页面
+- ✅ JWT token管理和Axios拦截器（自动附加token、自动刷新）
+- ✅ 用户状态管理（Zustand store with persistence）
+- ✅ 权限控制和路由守卫（ProtectedRoute, AdminRoute）
+- ✅ 用户管理页面（管理员专属，CRUD操作）
+- ✅ 动态侧边栏导航（基于角色显示）
+- ✅ 用户资料下拉菜单（登出功能）
+- ✅ 标签颜色选择器增强（20+预设颜色+自定义输入）
+
+**文档更新**：
+- ✅ README.md 添加多用户协作特性说明
+- ✅ README.md 添加默认管理员账户信息
+- ✅ README.md 添加用户管理使用指南
+- ✅ .env.example 添加 JWT 配置项
+- ✅ M4_PLAN.md 更新完成状态
 
 ---
 
