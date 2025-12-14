@@ -25,6 +25,11 @@
 - ✅ 动态侧边栏导航（基于角色显示）
 - ✅ 用户资料下拉菜单（登出功能）
 - ✅ 标签颜色选择器增强（20+预设颜色+自定义输入）
+- ✅ **完整的RBAC权限控制**：
+  - Projects API全面保护（创建/更新/删除需要管理员权限）
+  - Datasets API全面保护（创建/扫描/删除需要管理员权限）
+  - 前端UI基于角色显示（标注员隐藏创建项目按钮）
+  - 所有API端点正确应用认证和授权检查
 
 **文档更新**：
 - ✅ README.md 添加多用户协作特性说明
@@ -480,4 +485,91 @@ export function ProtectedRoute({ children, requireAdmin = false }) {
 ---
 
 **准备开始实施！🚀**
+
+
+---
+
+## 🔐 完整API权限表
+
+### 公开API（无需认证）
+| 路由 | 方法 | 说明 |
+|------|------|------|
+| `/api/v1/healthz` | GET | 健康检查 |
+| `/api/v1/auth/register` | POST | 用户注册 |
+| `/api/v1/auth/login` | POST | 用户登录 |
+
+### 认证API（需要登录）
+| 路由 | 方法 | 角色要求 | 说明 |
+|------|------|----------|------|
+| `/api/v1/auth/refresh` | POST | 所有用户 | 刷新访问令牌 |
+| `/api/v1/auth/logout` | POST | 所有用户 | 用户登出 |
+| `/api/v1/auth/me` | GET | 所有用户 | 获取当前用户信息 |
+| `/api/v1/auth/me/password` | PUT | 所有用户 | 修改密码 |
+
+### 项目API
+| 路由 | 方法 | 角色要求 | 说明 |
+|------|------|----------|------|
+| `/api/v1/projects` | GET | 所有用户 | 查看项目列表 |
+| `/api/v1/projects` | POST | **仅管理员** | 创建新项目 |
+| `/api/v1/projects/{id}` | GET | 所有用户 | 查看项目详情 |
+| `/api/v1/projects/{id}` | PUT | **仅管理员** | 更新项目 |
+| `/api/v1/projects/{id}` | DELETE | **仅管理员** | 删除项目 |
+
+### 数据集API
+| 路由 | 方法 | 角色要求 | 说明 |
+|------|------|----------|------|
+| `/api/v1/projects/{id}/datasets` | GET | 所有用户 | 查看数据集列表 |
+| `/api/v1/projects/{id}/datasets` | POST | **仅管理员** | 创建新数据集 |
+| `/api/v1/datasets/{id}` | GET | 所有用户 | 查看数据集详情 |
+| `/api/v1/datasets/{id}/scan` | POST | **仅管理员** | 扫描服务器路径导入图片 |
+| `/api/v1/datasets/{id}` | DELETE | **仅管理员** | 删除数据集 |
+
+### 标注API
+| 路由 | 方法 | 角色要求 | 说明 |
+|------|------|----------|------|
+| `/api/v1/datasets/{id}/items` | GET | 所有用户 | 查看图片列表 |
+| `/api/v1/datasets/{id}/next-item` | GET | 所有用户 | 获取下一张待标注图片（自动分配） |
+| `/api/v1/items/{id}` | GET | 所有用户 | 查看图片详情 |
+| `/api/v1/items/{id}/classification` | POST | 所有用户 | 提交分类标注 |
+| `/api/v1/items/{id}/skip` | POST | 所有用户 | 跳过图片 |
+| `/api/v1/items/{id}` | DELETE | 所有用户 | 删除图片 |
+
+### 用户管理API
+| 路由 | 方法 | 角色要求 | 说明 |
+|------|------|----------|------|
+| `/api/v1/users` | GET | **仅管理员** | 查看用户列表 |
+| `/api/v1/users` | POST | **仅管理员** | 创建新用户 |
+| `/api/v1/users/{id}` | GET | **仅管理员** | 查看用户详情 |
+| `/api/v1/users/{id}` | PUT | **仅管理员** | 更新用户信息 |
+| `/api/v1/users/{id}/role` | PUT | **仅管理员** | 修改用户角色 |
+| `/api/v1/users/{id}` | DELETE | **仅管理员** | 删除用户 |
+
+### 统计API
+| 路由 | 方法 | 角色要求 | 说明 |
+|------|------|----------|------|
+| `/api/v1/projects/{id}/dashboard/overview` | GET | 所有用户 | 项目概览统计 |
+| `/api/v1/projects/{id}/dashboard/daily` | GET | 所有用户 | 每日进度统计 |
+| `/api/v1/projects/{id}/dashboard/annotators` | GET | 所有用户 | 标注员绩效统计 |
+
+### 导入导出API
+| 路由 | 方法 | 角色要求 | 说明 |
+|------|------|----------|------|
+| `/api/v1/datasets/{id}/import` | POST | **仅管理员** | 导入预标注数据 |
+| `/api/v1/datasets/{id}/export` | POST | 所有用户 | 导出标注数据 |
+
+### 媒体服务API
+| 路由 | 方法 | 角色要求 | 说明 |
+|------|------|----------|------|
+| `/api/v1/media/{path}` | GET | 所有用户 | 获取原始图片 |
+| `/api/v1/thumb/{path}` | GET | 所有用户 | 获取缩略图 |
+
+---
+
+## 📝 权限设计原则
+
+1. **最小权限原则**：用户默认只能访问自己需要的资源
+2. **角色分离**：管理员负责项目管理，标注员专注标注工作
+3. **自动分配**：获取 `/next-item` 时自动将图片分配给当前用户
+4. **审计追踪**：所有操作记录到 `AnnotationEvent`，追溯到具体用户
+5. **前后端一致**：前端UI隐藏，后端API强制检查，双重保护
 
