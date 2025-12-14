@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useUserStore } from '@/stores/userStore' // M4: For JWT token
 
 interface PrefetchOptions {
   /**
@@ -30,11 +31,12 @@ export function useImagePrefetch(
     bandwidthThreshold = 2, // 2 Mbps
   } = options
 
+  const { accessToken } = useUserStore() // M4: Get JWT token
   const prefetchedRef = useRef<Set<string>>(new Set())
   const prefetchLinksRef = useRef<HTMLLinkElement[]>([])
 
   useEffect(() => {
-    if (!currentImageUrl) return
+    if (!currentImageUrl || !accessToken) return
 
     // 检查网络连接类型
     let effectivePrefetchCount = prefetchCount
@@ -57,26 +59,32 @@ export function useImagePrefetch(
     prefetchLinksRef.current.forEach((link) => link.remove())
     prefetchLinksRef.current = []
 
-    // 预取后续图片
+    // 预取后续图片（使用 fetch 附加 JWT token）
     const urlsToPrefetch = upcomingImageUrls.slice(0, effectivePrefetchCount)
 
     urlsToPrefetch.forEach((url) => {
       if (prefetchedRef.current.has(url)) return
 
-      // 使用 <link rel="prefetch"> 方式
-      const link = document.createElement('link')
-      link.rel = 'prefetch'
-      link.as = 'image'
-      link.href = url
-      document.head.appendChild(link)
-      prefetchLinksRef.current.push(link)
-
-      // 标记为已预取
-      prefetchedRef.current.add(url)
-
-      // 备用方案：使用 Image 对象预加载
-      const img = new Image()
-      img.src = url
+      // M4: Use fetch with JWT token for prefetching
+      fetch(url, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      })
+        .then((response) => {
+          if (response.ok) {
+            return response.blob()
+          }
+          throw new Error(`Failed to prefetch: ${response.status}`)
+        })
+        .then(() => {
+          // Mark as prefetched
+          prefetchedRef.current.add(url)
+          console.log(`Prefetched: ${url}`)
+        })
+        .catch((error) => {
+          console.warn(`Failed to prefetch image: ${url}`, error)
+        })
     })
 
     // 清理函数
@@ -84,7 +92,7 @@ export function useImagePrefetch(
       // 保留预取的链接，但如果组件卸载则清除
       // prefetchLinksRef.current.forEach(link => link.remove())
     }
-  }, [currentImageUrl, upcomingImageUrls, prefetchCount, bandwidthAware, bandwidthThreshold])
+  }, [currentImageUrl, upcomingImageUrls, prefetchCount, bandwidthAware, bandwidthThreshold, accessToken])
 
   // 清理函数：组件卸载时清理所有预取
   useEffect(() => {
