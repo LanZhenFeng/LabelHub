@@ -1,16 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, Outlet, useLocation } from 'react-router-dom'
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { cn } from '@/lib/utils'
-import { FolderKanban, PanelLeftClose, PanelLeftOpen, Settings, Keyboard } from 'lucide-react'
+import { FolderKanban, PanelLeftClose, PanelLeftOpen, Settings, Keyboard, LogOut, User, Shield, Users } from 'lucide-react' // Added Users
 import { ShortcutsDialog } from '@/components/ShortcutsDialog'
-
-const navItems = [
-  { href: '/projects', label: '项目', icon: FolderKanban },
-  { href: '/settings', label: '设置', icon: Settings, disabled: true },
-]
+import { useUserStore } from '@/stores/userStore'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 export default function Layout() {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { user, logout } = useUserStore()
   const [collapsed, setCollapsed] = useState(() => {
     try {
       return window.localStorage.getItem('labelhub.sidebar.collapsed') === '1'
@@ -19,6 +25,32 @@ export default function Layout() {
     }
   })
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+
+  // M4: Dynamic navigation items based on user role
+  const navItems = useMemo(() => {
+    const items: Array<{
+      href: string
+      label: string
+      icon: typeof FolderKanban
+      disabled?: boolean
+    }> = [
+      { href: '/projects', label: '项目', icon: FolderKanban },
+    ]
+    
+    // M4: Admin-only navigation item
+    if (user?.role === 'admin') {
+      items.push({ href: '/users', label: '用户', icon: Users })
+    }
+    
+    items.push({ href: '/settings', label: '设置', icon: Settings, disabled: true })
+    
+    return items
+  }, [user?.role])
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login')
+  }
 
   useEffect(() => {
     try {
@@ -49,7 +81,7 @@ export default function Layout() {
   const activeHref = useMemo(() => {
     const found = navItems.find((i) => location.pathname.startsWith(i.href))
     return found?.href ?? '/projects'
-  }, [location.pathname])
+  }, [location.pathname, navItems])
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-background via-background to-muted/40">
@@ -152,6 +184,62 @@ export default function Layout() {
 
         {/* Footer */}
         <div className={cn('border-t space-y-2', collapsed ? 'p-2' : 'p-4')}>
+          {/* M4: User Profile Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className={cn(
+                  'w-full flex items-center gap-3 rounded-xl text-sm font-medium transition-colors hover:bg-muted/50',
+                  collapsed ? 'justify-center p-2' : 'px-3 py-2'
+                )}
+                title={collapsed ? `${user?.username} (${user?.role === 'admin' ? '管理员' : '标注员'})` : undefined}
+              >
+                <div
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border bg-gradient-to-br from-primary/15 to-accent/15 border-primary/25 shadow-sm"
+                >
+                  {user?.role === 'admin' ? (
+                    <Shield className="h-5 w-5 text-primary" />
+                  ) : (
+                    <User className="h-5 w-5 text-primary" />
+                  )}
+                </div>
+                {!collapsed && (
+                  <div className="flex flex-col items-start min-w-0 flex-1 text-left">
+                    <span className="text-sm font-medium truncate w-full text-foreground">
+                      {user?.username}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {user?.role === 'admin' ? '管理员' : '标注员'}
+                    </span>
+                  </div>
+                )}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium leading-none">{user?.username}</p>
+                  <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {/* M4: User management for admin (v1.1) */}
+              {/* {user?.role === 'admin' && (
+                <>
+                  <DropdownMenuItem onClick={() => navigate('/users')}>
+                    <Users className="mr-2 h-4 w-4" />
+                    <span>用户管理</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )} */}
+              <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>登出</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           {/* Shortcuts Trigger */}
           <button
             onClick={() => setShortcutsOpen(true)}
@@ -167,11 +255,11 @@ export default function Layout() {
           </button>
 
           {collapsed ? (
-            <div className="mx-auto h-2 w-2 rounded-full bg-primary/60" title="LabelHub v1.0.0" />
+            <div className="mx-auto h-2 w-2 rounded-full bg-primary/60" title="LabelHub v1.1.0" />
           ) : (
             <div className="text-xs text-muted-foreground space-y-0.5 px-3">
-              <p className="font-medium">LabelHub v1.0.0</p>
-              <p>M3 - Statistics &amp; Polish</p>
+              <p className="font-medium">LabelHub v1.1.0</p>
+              <p>M4 - Multi-user Auth</p>
             </div>
           )}
         </div>

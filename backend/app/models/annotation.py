@@ -14,6 +14,7 @@ from app.core.database import Base
 if TYPE_CHECKING:
     from app.models.item import Item
     from app.models.label import Label
+    from app.models.user import User
 
 
 class ClassificationAnnotation(Base):
@@ -79,7 +80,12 @@ class AnnotationEvent(Base):
         nullable=False,
         index=True,
     )
-    user_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="User who performed this action (M4: changed to FK)",
+    )
     event_type: Mapped[EventType] = mapped_column(Enum(EventType), nullable=False)
     ts: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -97,6 +103,9 @@ class AnnotationEvent(Base):
         nullable=True,
         comment="Time spent on this action in milliseconds",
     )
+
+    # Relationships
+    user: Mapped["User | None"] = relationship("User", back_populates="annotation_events")
 
     def __repr__(self) -> str:
         return f"<AnnotationEvent(id={self.id}, type={self.event_type}, item_id={self.item_id})>"

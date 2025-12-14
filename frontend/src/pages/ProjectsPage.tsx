@@ -14,6 +14,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -33,16 +38,29 @@ import {
 } from '@/components/ui/tooltip'
 import { useToast } from '@/hooks/use-toast'
 import { projectsApi, datasetsApi, type Project, type Dataset } from '@/lib/api'
+import { useUserStore } from '@/stores/userStore' // M4: For role checking
 
 const PRESET_COLORS = [
-  '#EF4444',
-  '#F97316',
-  '#EAB308',
-  '#22C55E',
-  '#14B8A6',
-  '#3B82F6',
-  '#8B5CF6',
-  '#EC4899',
+  '#EF4444', // 红色
+  '#F97316', // 橙色
+  '#F59E0B', // 琥珀色
+  '#EAB308', // 黄色
+  '#84CC16', // 青柠色
+  '#22C55E', // 绿色
+  '#10B981', // 翠绿色
+  '#14B8A6', // 蓝绿色
+  '#06B6D4', // 青色
+  '#0EA5E9', // 天蓝色
+  '#3B82F6', // 蓝色
+  '#6366F1', // 靛蓝色
+  '#8B5CF6', // 紫色
+  '#A855F7', // 紫红色
+  '#D946EF', // 品红色
+  '#EC4899', // 粉色
+  '#F43F5E', // 玫瑰色
+  '#64748B', // 石板灰
+  '#6B7280', // 灰色
+  '#78716C', // 暖灰色
 ]
 
 const TASK_TYPE_MAP: Record<string, string> = {
@@ -54,6 +72,7 @@ const TASK_TYPE_MAP: Record<string, string> = {
 export default function ProjectsPage() {
   const { toast } = useToast()
   const queryClient = useQueryClient()
+  const { isAdmin } = useUserStore() // M4: Check if user is admin
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isDatasetOpen, setIsDatasetOpen] = useState(false)
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
@@ -146,6 +165,12 @@ export default function ProjectsPage() {
     setLabels(newLabels)
   }
 
+  const handleColorChange = (index: number, color: string) => {
+    const newLabels = [...labels]
+    newLabels[index].color = color
+    setLabels(newLabels)
+  }
+
   const handleRemoveLabel = (index: number) => {
     if (labels.length > 1) {
       setLabels(labels.filter((_, i) => i !== index))
@@ -160,8 +185,10 @@ export default function ProjectsPage() {
           <h1 className="text-3xl font-bold tracking-tight">我的项目</h1>
           <p className="text-muted-foreground mt-1">管理您的所有标注项目</p>
         </div>
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
+        {/* M4: Only admins can create projects */}
+        {isAdmin() && (
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild>
             <Button>
               <Plus className="w-4 h-4 mr-2" />
               新建项目
@@ -201,10 +228,64 @@ export default function ProjectsPage() {
                   {labels.map((label, index) => (
                     <div key={index} className="flex items-center gap-2">
                       <kbd className="w-6 h-6 flex items-center justify-center text-xs bg-muted rounded border">{index + 1}</kbd>
-                      <div
-                        className="w-6 h-6 rounded border cursor-pointer ring-offset-background transition-colors hover:ring-2 hover:ring-ring hover:ring-offset-2"
-                        style={{ backgroundColor: label.color }}
-                      />
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button
+                            type="button"
+                            className="w-6 h-6 rounded border cursor-pointer ring-offset-background transition-all hover:ring-2 hover:ring-ring hover:ring-offset-2"
+                            style={{ backgroundColor: label.color }}
+                            title="点击选择颜色"
+                          />
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-3" align="start">
+                          <div className="space-y-3">
+                            {/* 预设颜色 */}
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground mb-2">预设颜色</p>
+                              <div className="grid grid-cols-5 gap-2">
+                                {PRESET_COLORS.map((color) => (
+                                  <button
+                                    key={color}
+                                    type="button"
+                                    className="w-8 h-8 rounded border-2 transition-all hover:scale-110"
+                                    style={{
+                                      backgroundColor: color,
+                                      borderColor: label.color === color ? 'hsl(var(--primary))' : 'transparent',
+                                    }}
+                                    onClick={() => handleColorChange(index, color)}
+                                    title={color}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                            {/* 自定义颜色 */}
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground mb-2">自定义颜色</p>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="color"
+                                  value={label.color}
+                                  onChange={(e) => handleColorChange(index, e.target.value.toUpperCase())}
+                                  className="w-12 h-8 rounded border cursor-pointer"
+                                />
+                                <Input
+                                  type="text"
+                                  value={label.color}
+                                  onChange={(e) => {
+                                    const value = e.target.value.toUpperCase()
+                                    if (/^#[0-9A-F]{0,6}$/.test(value)) {
+                                      handleColorChange(index, value)
+                                    }
+                                  }}
+                                  placeholder="#RRGGBB"
+                                  className="flex-1 h-8 font-mono text-xs"
+                                  maxLength={7}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                       <Input
                         placeholder={`标签 ${index + 1}`}
                         value={label.name}
@@ -243,6 +324,7 @@ export default function ProjectsPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        )}
       </div>
 
       {/* Project Grid */}

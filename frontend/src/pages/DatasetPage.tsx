@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Progress } from '@/components/ui/progress'
+import { AuthImage } from '@/components/AuthImage' // M4: For authenticated image loading
 import {
   Dialog,
   DialogContent,
@@ -438,22 +439,17 @@ export default function DatasetPage() {
 }
 
 function ImageCard({ item }: { item: Item }) {
-  const [loaded, setLoaded] = useState(false)
   const config = statusConfig[item.status]
   const Icon = config.icon
 
   return (
     <div className="group relative aspect-square rounded-xl overflow-hidden bg-muted border shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md hover:border-primary/30">
-      {!loaded && <div className="skeleton absolute inset-0" />}
-      <img
+      <AuthImage
         src={item.thumb_url}
         alt={item.filename}
-        className={cn(
-          'w-full h-full object-cover transition-opacity',
-          loaded ? 'opacity-100' : 'opacity-0'
-        )}
-        onLoad={() => setLoaded(true)}
-        loading="lazy"
+        className="w-full h-full object-cover"
+        width="100%"
+        height="100%"
       />
       {/* Status badge */}
       <div className="absolute top-2 right-2">
@@ -483,20 +479,18 @@ function ImageCard({ item }: { item: Item }) {
 }
 
 function ImageRow({ item }: { item: Item }) {
-  const [loaded, setLoaded] = useState(false)
   const config = statusConfig[item.status]
   const Icon = config.icon
 
   return (
     <div className="flex items-center gap-4 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors">
       <div className="w-12 h-12 rounded overflow-hidden bg-muted flex-shrink-0">
-        {!loaded && <div className="skeleton w-full h-full" />}
-        <img
+        <AuthImage
           src={item.thumb_url}
           alt={item.filename}
-          className={cn('w-full h-full object-cover', loaded ? 'block' : 'hidden')}
-          onLoad={() => setLoaded(true)}
-          loading="lazy"
+          className="w-full h-full object-cover"
+          width="48px"
+          height="48px"
         />
       </div>
       <div className="flex-1 min-w-0">

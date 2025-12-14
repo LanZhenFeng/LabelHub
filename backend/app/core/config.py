@@ -50,6 +50,19 @@ class Settings(BaseSettings):
     port: int = 8000
     log_level: Literal["debug", "info", "warning", "error"] = "info"
 
+    # JWT Authentication (M4)
+    jwt_secret_key: str = Field(
+        default="your-secret-key-change-in-production-min-32-chars",
+        description="JWT secret key for token signing (MUST change in production!)",
+    )
+    jwt_algorithm: str = Field(default="HS256", description="JWT signing algorithm")
+    access_token_expire_minutes: int = Field(
+        default=15, description="Access token expiration time in minutes"
+    )
+    refresh_token_expire_days: int = Field(
+        default=7, description="Refresh token expiration time in days"
+    )
+
     @property
     def cors_origins_list(self) -> list[str]:
         """Parse CORS origins string into a list."""

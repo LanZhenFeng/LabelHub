@@ -7,6 +7,69 @@ const api = axios.create({
   },
 })
 
+// M4: Setup authentication interceptors
+export function setupAuthInterceptors(
+  getAccessToken: () => string | null,
+  getRefreshToken: () => string | null,
+  setTokens: (access: string, refresh: string) => void,
+  clearAuth: () => void
+) {
+  // Request interceptor: Add access token to headers
+  api.interceptors.request.use(
+    (config) => {
+      const accessToken = getAccessToken()
+      if (accessToken) {
+        config.headers.Authorization = `Bearer ${accessToken}`
+      }
+      return config
+    },
+    (error) => Promise.reject(error)
+  )
+
+  // Response interceptor: Handle 401 and refresh token
+  api.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+      const originalRequest = error.config
+      const refreshToken = getRefreshToken()
+
+      // If 401 and not already retrying, and not a refresh/login request
+      if (
+        error.response?.status === 401 &&
+        !originalRequest._retry &&
+        refreshToken &&
+        !originalRequest.url?.includes('/auth/refresh') &&
+        !originalRequest.url?.includes('/auth/login')
+      ) {
+        originalRequest._retry = true
+
+        try {
+          // Try to refresh the token
+          const response = await axios.post('/api/v1/auth/refresh', {
+            refresh_token: refreshToken,
+          })
+          
+          const { access_token, refresh_token } = response.data
+          setTokens(access_token, refresh_token)
+
+          // Retry the original request with new token
+          originalRequest.headers.Authorization = `Bearer ${access_token}`
+          return api(originalRequest)
+        } catch (refreshError) {
+          // Refresh failed, clear auth and redirect to login
+          clearAuth()
+          if (typeof window !== 'undefined') {
+            window.location.href = '/login'
+          }
+          return Promise.reject(refreshError)
+        }
+      }
+
+      return Promise.reject(error)
+    }
+  )
+}
+
 // Types
 export interface Label {
   id: number
@@ -342,5 +405,129 @@ export const statsApi = {
       .then((r) => r.data),
 }
 
+// ============= M4: Authentication API =============
+export interface User {
+  id: number
+  username: string
+  email: string
+  role: 'admin' | 'annotator' | 'reviewer'
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface LoginRequest {
+  username: string
+  password: string
+}
+
+export interface LoginResponse {
+  access_token: string
+  refresh_token: string
+  token_type: string
+  user: User
+}
+
+export interface RegisterRequest {
+  username: string
+  email: string
+  password: string
+}
+
+export interface RegisterResponse {
+  user: User
+  access_token: string
+  refresh_token: string
+  token_type: string
+}
+
+export interface RefreshTokenRequest {
+  refresh_token: string
+}
+
+export interface RefreshTokenResponse {
+  access_token: string
+  token_type: string
+}
+
+export interface UpdatePasswordRequest {
+  old_password: string
+  new_password: string
+}
+
+export const authApi = {
+  register: (data: RegisterRequest) =>
+    api.post<RegisterResponse>('/auth/register', data).then((r) => r.data),
+  
+  login: (data: LoginRequest) => {
+    // OAuth2 Password Flow requires form data
+    const formData = new URLSearchParams()
+    formData.append('username', data.username)
+    formData.append('password', data.password)
+    
+    return api
+      .post<LoginResponse>('/auth/login', formData, {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      })
+      .then((r) => r.data)
+  },
+
+  refresh: (refreshToken: string) =>
+    api
+      .post<RefreshTokenResponse>('/auth/refresh', { refresh_token: refreshToken })
+      .then((r) => r.data),
+
+  me: () => api.get<User>('/auth/me').then((r) => r.data),
+
+  updatePassword: (data: UpdatePasswordRequest) =>
+    api.put<{ message: string }>('/auth/me/password', data).then((r) => r.data),
+
+  logout: () => api.post<{ message: string }>('/auth/logout').then((r) => r.data),
+}
+
+// User Management API (Admin only)
+export interface UserCreateRequest {
+  username: string
+  email: string
+  password: string
+  role?: 'admin' | 'annotator'
+}
+
+export interface UserUpdateRequest {
+  email?: string
+  is_active?: boolean
+}
+
+export interface UserUpdateRoleRequest {
+  role: 'admin' | 'annotator' | 'reviewer'
+}
+
+export interface UsersListResponse {
+  items: User[]
+  total: number
+  page: number
+  limit: number
+  pages: number
+}
+
+export const usersApi = {
+  list: (params?: { page?: number; limit?: number; role?: string; is_active?: boolean }) =>
+    api.get<UsersListResponse>('/users', { params }).then((r) => r.data.items),
+
+  create: (data: UserCreateRequest) =>
+    api.post<User>('/users', data).then((r) => r.data),
+
+  get: (id: number) => api.get<User>(`/users/${id}`).then((r) => r.data),
+
+  update: (id: number, data: UserUpdateRequest) =>
+    api.put<User>(`/users/${id}`, data).then((r) => r.data),
+
+  updateRole: (id: number, role: 'admin' | 'annotator') =>
+    api.put<User>(`/users/${id}/role`, { role }).then((r) => r.data),
+
+  remove: (id: number) => api.delete(`/users/${id}`).then((r) => r.data),
+}
+
 export default api
+
 
