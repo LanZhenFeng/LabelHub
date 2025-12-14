@@ -7,6 +7,7 @@ import { useEffect, useRef, useCallback, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { ZoomIn, ZoomOut, Maximize } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useUserStore } from '@/stores/userStore' // M4: For JWT token
 
 interface ImageViewerProps {
   imageUrl: string
@@ -22,8 +23,9 @@ export function ImageViewer({ imageUrl, className }: ImageViewerProps) {
   const [isPanning, setIsPanning] = useState(false)
   const [lastPanPoint, setLastPanPoint] = useState<{ x: number; y: number } | null>(null)
   const [isSpacePressed, setIsSpacePressed] = useState(false)
+  const { accessToken } = useUserStore() // M4: Get JWT token
 
-  // Initialize canvas and load image
+  // Initialize canvas and load image with authentication
   useEffect(() => {
     const canvas = canvasRef.current
     const container = containerRef.current
@@ -33,26 +35,54 @@ export function ImageViewer({ imageUrl, className }: ImageViewerProps) {
     canvas.width = container.clientWidth
     canvas.height = container.clientHeight
 
-    // Load image
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    img.onload = () => {
-      imageRef.current = img
-      // Calculate initial scale to fit
-      const scaleX = canvas.width / img.width
-      const scaleY = canvas.height / img.height
-      const initialScale = Math.min(scaleX, scaleY, 1) * 0.9 // 90% to add padding
-      
-      // Center the image
-      const scaledWidth = img.width * initialScale
-      const scaledHeight = img.height * initialScale
-      setOffset({
-        x: (canvas.width - scaledWidth) / 2,
-        y: (canvas.height - scaledHeight) / 2,
-      })
-      setZoom(initialScale)
+    // Load image with fetch (to attach JWT token)
+    const loadImage = async () => {
+      try {
+        const response = await fetch(imageUrl, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        })
+
+        if (!response.ok) {
+          console.error(`Failed to load image: ${response.status}`)
+          return
+        }
+
+        const blob = await response.blob()
+        const objectUrl = URL.createObjectURL(blob)
+
+        const img = new Image()
+        img.onload = () => {
+          imageRef.current = img
+          // Calculate initial scale to fit
+          const scaleX = canvas.width / img.width
+          const scaleY = canvas.height / img.height
+          const initialScale = Math.min(scaleX, scaleY, 1) * 0.9 // 90% to add padding
+          
+          // Center the image
+          const scaledWidth = img.width * initialScale
+          const scaledHeight = img.height * initialScale
+          setOffset({
+            x: (canvas.width - scaledWidth) / 2,
+            y: (canvas.height - scaledHeight) / 2,
+          })
+          setZoom(initialScale)
+
+          // Clean up object URL
+          URL.revokeObjectURL(objectUrl)
+        }
+        img.onerror = () => {
+          console.error('Failed to decode image')
+          URL.revokeObjectURL(objectUrl)
+        }
+        img.src = objectUrl
+      } catch (error) {
+        console.error('Failed to fetch image:', error)
+      }
     }
-    img.src = imageUrl
+
+    loadImage()
 
     // Handle window resize
     const handleResize = () => {
@@ -63,7 +93,7 @@ export function ImageViewer({ imageUrl, className }: ImageViewerProps) {
     }
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
-  }, [imageUrl])
+  }, [imageUrl, accessToken])
 
   // Draw image on canvas
   const drawImage = useCallback(() => {

@@ -8,6 +8,7 @@ import { useCanvas } from '@/hooks/use-canvas'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { useUserStore } from '@/stores/userStore' // M4: For JWT token
 import type { Label } from '@/lib/api'
 import type { AnnotationData } from '@/lib/canvas/types'
 import {
@@ -71,6 +72,7 @@ export function AnnotationCanvas({
   isDirty,
 }: AnnotationCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const { accessToken } = useUserStore() // M4: Get JWT token
 
   const {
     initCanvas,
@@ -100,11 +102,11 @@ export function AnnotationCanvas({
 
   // Initialize canvas when image URL changes
   useEffect(() => {
-    if (containerRef.current && imageUrl) {
-      initCanvas(containerRef.current, imageUrl)
+    if (containerRef.current && imageUrl && accessToken) {
+      initCanvas(containerRef.current, imageUrl, accessToken)
       setTool('select')
     }
-  }, [imageUrl, initCanvas, setTool])
+  }, [imageUrl, accessToken, initCanvas, setTool])
 
   // Load initial annotations
   const prevAnnotationsRef = useRef<string>('')

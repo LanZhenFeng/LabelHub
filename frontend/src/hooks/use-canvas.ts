@@ -146,7 +146,7 @@ export function useCanvas(options: UseCanvasOptions = {}) {
   }, [onSelectionChange])
 
   // Initialize canvas
-  const initCanvas = useCallback((container: HTMLDivElement, imageUrl: string) => {
+  const initCanvas = useCallback(async (container: HTMLDivElement, imageUrl: string, accessToken: string) => {
     // Cleanup previous canvas
     if (canvasRef.current) {
       canvasRef.current.dispose()
@@ -155,63 +155,81 @@ export function useCanvas(options: UseCanvasOptions = {}) {
 
     containerRef.current = container
 
-    // Load image first to get dimensions
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    img.onload = () => {
-      const containerWidth = container.clientWidth
-      const containerHeight = container.clientHeight
-
-      // Store image dimensions for reset
-      imageDimensionsRef.current = { width: img.width, height: img.height }
-
-      // Calculate scale to fit image in container with padding
-      const padding = 40
-      const availableWidth = containerWidth - padding * 2
-      const availableHeight = containerHeight - padding * 2
-      const scaleX = availableWidth / img.width
-      const scaleY = availableHeight / img.height
-      const scale = Math.min(scaleX, scaleY, 1) // Don't scale up
-
-      // Store initial scale for reset
-      initialScaleRef.current = scale
-
-      // Canvas fills the entire container
-      const canvasEl = document.createElement('canvas')
-      canvasEl.id = 'annotation-canvas'
-      canvasEl.width = containerWidth
-      canvasEl.height = containerHeight
-      container.innerHTML = ''
-      container.appendChild(canvasEl)
-
-      // Create Fabric canvas filling the container
-      const canvas = new FabricCanvas(canvasEl, {
-        width: containerWidth,
-        height: containerHeight,
-        selection: true,
-        preserveObjectStacking: true,
-      })
-      canvasRef.current = canvas
-
-      // Set background image using FabricImage - centered in canvas
-      FabricImage.fromURL(imageUrl, { crossOrigin: 'anonymous' }).then((fabricImg) => {
-        // Position image centered
-        const imageWidth = img.width * scale
-        const imageHeight = img.height * scale
-        const offsetX = (containerWidth - imageWidth) / 2
-        const offsetY = (containerHeight - imageHeight) / 2
-
-        fabricImg.scaleX = scale
-        fabricImg.scaleY = scale
-        fabricImg.left = offsetX
-        fabricImg.top = offsetY
-        fabricImg.selectable = false
-        fabricImg.evented = false
-        canvas.backgroundImage = fabricImg
-        canvas.requestRenderAll()
+    try {
+      // M4: Fetch image with JWT token
+      const response = await fetch(imageUrl, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
       })
 
-      setZoom(1) // Zoom is now relative to initial view (1 = fit to container)
+      if (!response.ok) {
+        console.error(`Failed to load image: ${response.status}`)
+        return
+      }
+
+      const blob = await response.blob()
+      const objectUrl = URL.createObjectURL(blob)
+
+      // Load image first to get dimensions
+      const img = new Image()
+      img.onload = () => {
+        const containerWidth = container.clientWidth
+        const containerHeight = container.clientHeight
+
+        // Store image dimensions for reset
+        imageDimensionsRef.current = { width: img.width, height: img.height }
+
+        // Calculate scale to fit image in container with padding
+        const padding = 40
+        const availableWidth = containerWidth - padding * 2
+        const availableHeight = containerHeight - padding * 2
+        const scaleX = availableWidth / img.width
+        const scaleY = availableHeight / img.height
+        const scale = Math.min(scaleX, scaleY, 1) // Don't scale up
+
+        // Store initial scale for reset
+        initialScaleRef.current = scale
+
+        // Canvas fills the entire container
+        const canvasEl = document.createElement('canvas')
+        canvasEl.id = 'annotation-canvas'
+        canvasEl.width = containerWidth
+        canvasEl.height = containerHeight
+        container.innerHTML = ''
+        container.appendChild(canvasEl)
+
+        // Create Fabric canvas filling the container
+        const canvas = new FabricCanvas(canvasEl, {
+          width: containerWidth,
+          height: containerHeight,
+          selection: true,
+          preserveObjectStacking: true,
+        })
+        canvasRef.current = canvas
+
+        // Set background image using FabricImage - centered in canvas
+        FabricImage.fromURL(objectUrl).then((fabricImg) => {
+          // Position image centered
+          const imageWidth = img.width * scale
+          const imageHeight = img.height * scale
+          const offsetX = (containerWidth - imageWidth) / 2
+          const offsetY = (containerHeight - imageHeight) / 2
+
+          fabricImg.scaleX = scale
+          fabricImg.scaleY = scale
+          fabricImg.left = offsetX
+          fabricImg.top = offsetY
+          fabricImg.selectable = false
+          fabricImg.evented = false
+          canvas.backgroundImage = fabricImg
+          canvas.requestRenderAll()
+
+          // Clean up object URL
+          URL.revokeObjectURL(objectUrl)
+        })
+
+        setZoom(1) // Zoom is now relative to initial view (1 = fit to container)
 
       // Event handlers
       canvas.on('selection:created', (e) => {
@@ -293,7 +311,15 @@ export function useCanvas(options: UseCanvasOptions = {}) {
         }
       })
     }
-    img.src = imageUrl
+    
+    img.onerror = () => {
+      console.error('Failed to decode image')
+      URL.revokeObjectURL(objectUrl)
+    }
+    img.src = objectUrl
+    } catch (error) {
+      console.error('Failed to fetch image:', error)
+    }
   }, [setSelectedAnnotationId])
 
   // Set tool
