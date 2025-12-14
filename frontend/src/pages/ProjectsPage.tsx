@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/tooltip'
 import { useToast } from '@/hooks/use-toast'
 import { projectsApi, datasetsApi, type Project, type Dataset } from '@/lib/api'
+import { useUserStore } from '@/stores/userStore' // M4: For role checking
 
 const PRESET_COLORS = [
   '#EF4444', // 红色
@@ -71,6 +72,7 @@ const TASK_TYPE_MAP: Record<string, string> = {
 export default function ProjectsPage() {
   const { toast } = useToast()
   const queryClient = useQueryClient()
+  const { isAdmin } = useUserStore() // M4: Check if user is admin
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isDatasetOpen, setIsDatasetOpen] = useState(false)
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
@@ -183,8 +185,10 @@ export default function ProjectsPage() {
           <h1 className="text-3xl font-bold tracking-tight">我的项目</h1>
           <p className="text-muted-foreground mt-1">管理您的所有标注项目</p>
         </div>
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
+        {/* M4: Only admins can create projects */}
+        {isAdmin() && (
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild>
             <Button>
               <Plus className="w-4 h-4 mr-2" />
               新建项目
@@ -320,6 +324,7 @@ export default function ProjectsPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        )}
       </div>
 
       {/* Project Grid */}

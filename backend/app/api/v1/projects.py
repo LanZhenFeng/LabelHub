@@ -5,6 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.api.dependencies import AdminUser, CurrentUser, get_current_user  # M4: Add auth dependencies
 from app.core.database import get_db
 from app.models.dataset import Dataset
 from app.models.item import Item, ItemStatus
@@ -19,8 +20,9 @@ router = APIRouter()
 async def create_project(
     project_in: ProjectCreate,
     db: AsyncSession = Depends(get_db),
+    admin: AdminUser = Depends(),  # M4: Only admins can create projects
 ):
-    """Create a new project with optional labels."""
+    """Create a new project with optional labels (Admin only)."""
     project = Project(
         name=project_in.name,
         description=project_in.description,
@@ -49,6 +51,7 @@ async def create_project(
 @router.get("", response_model=list[ProjectResponse])
 async def list_projects(
     db: AsyncSession = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),  # M4: Require authentication
 ):
     """List all projects with statistics."""
     # Get projects with labels
@@ -69,6 +72,7 @@ async def list_projects(
 async def get_project(
     project_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),  # M4: Require authentication
 ):
     """Get a project by ID."""
     query = select(Project).options(selectinload(Project.labels)).where(Project.id == project_id)
@@ -87,8 +91,9 @@ async def update_project(
     project_id: int,
     project_in: ProjectUpdate,
     db: AsyncSession = Depends(get_db),
+    admin: AdminUser = Depends(),  # M4: Only admins can update projects
 ):
-    """Update a project."""
+    """Update a project (Admin only)."""
     query = select(Project).options(selectinload(Project.labels)).where(Project.id == project_id)
     result = await db.execute(query)
     project = result.scalar_one_or_none()
@@ -112,8 +117,9 @@ async def update_project(
 async def delete_project(
     project_id: int,
     db: AsyncSession = Depends(get_db),
+    admin: AdminUser = Depends(),  # M4: Only admins can delete projects
 ):
-    """Delete a project."""
+    """Delete a project (Admin only)."""
     query = select(Project).where(Project.id == project_id)
     result = await db.execute(query)
     project = result.scalar_one_or_none()

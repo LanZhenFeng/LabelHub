@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.dependencies import AdminUser, CurrentUser, get_current_user  # M4: Add auth dependencies
 from app.core.database import get_db
 from app.models.dataset import Dataset
 from app.models.item import Item, ItemStatus
@@ -23,8 +24,9 @@ async def create_dataset(
     project_id: int,
     dataset_in: DatasetCreate,
     db: AsyncSession = Depends(get_db),
+    admin: AdminUser = Depends(),  # M4: Only admins can create datasets
 ):
-    """Create a new dataset in a project."""
+    """Create a new dataset in a project (Admin only)."""
     # Verify project exists
     project_query = select(Project).where(Project.id == project_id)
     result = await db.execute(project_query)
@@ -93,8 +95,9 @@ async def scan_dataset(
     dataset_id: int,
     scan_request: ScanRequest,
     db: AsyncSession = Depends(get_db),
+    admin: AdminUser = Depends(),  # M4: Only admins can scan datasets
 ):
-    """Scan server path and import images into dataset."""
+    """Scan server path and import images into dataset (Admin only)."""
     query = select(Dataset).where(Dataset.id == dataset_id)
     result = await db.execute(query)
     dataset = result.scalar_one_or_none()
@@ -114,8 +117,9 @@ async def scan_dataset(
 async def delete_dataset(
     dataset_id: int,
     db: AsyncSession = Depends(get_db),
+    admin: AdminUser = Depends(),  # M4: Only admins can delete datasets
 ):
-    """Delete a dataset."""
+    """Delete a dataset (Admin only)."""
     query = select(Dataset).where(Dataset.id == dataset_id)
     result = await db.execute(query)
     dataset = result.scalar_one_or_none()
