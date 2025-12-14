@@ -16,6 +16,7 @@ class UserCreate(UserBase):
     """创建用户请求"""
 
     password: str = Field(..., min_length=8, max_length=100, description="密码")
+    role: str = Field(default="annotator", pattern="^(admin|annotator)$", description="用户角色")
 
     @field_validator("password")
     @classmethod

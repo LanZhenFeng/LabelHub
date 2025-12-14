@@ -10,7 +10,9 @@ import AnnotatePage from '@/pages/AnnotatePage'
 import CanvasAnnotatePage from '@/pages/CanvasAnnotatePage'
 import ImportPage from '@/pages/ImportPage'
 import DashboardPage from '@/pages/DashboardPage'
+import UsersPage from '@/pages/UsersPage' // M4: User management page
 import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { useUserStore } from '@/stores/userStore' // M4: For role checking
 import { projectsApi } from '@/lib/api'
 import { Loader2 } from 'lucide-react'
 
@@ -41,6 +43,17 @@ function AnnotateRouter() {
   return <CanvasAnnotatePage />
 }
 
+// M4: Admin-only route wrapper
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { user } = useUserStore()
+  
+  if (user?.role !== 'admin') {
+    return <Navigate to="/projects" replace />
+  }
+  
+  return <>{children}</>
+}
+
 function App() {
   return (
     <>
@@ -64,10 +77,17 @@ function App() {
           <Route path="projects/:projectId/datasets/:datasetId" element={<DatasetPage />} />
           <Route path="projects/:projectId/datasets/:datasetId/annotate" element={<AnnotateRouter />} />
           <Route path="projects/:projectId/datasets/:datasetId/import" element={<ImportPage />} />
+          
+          {/* M4: Admin-only route - User Management */}
+          <Route
+            path="users"
+            element={
+              <AdminRoute>
+                <UsersPage />
+              </AdminRoute>
+            }
+          />
         </Route>
-
-        {/* M4: Admin-only routes - Will be added in next commits */}
-        {/* <Route path="/users" element={<ProtectedRoute requireAdmin><UsersPage /></ProtectedRoute>} /> */}
       </Routes>
       <Toaster />
     </>

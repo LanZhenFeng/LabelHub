@@ -490,6 +490,7 @@ export interface UserCreateRequest {
   username: string
   email: string
   password: string
+  role?: 'admin' | 'annotator'
 }
 
 export interface UserUpdateRequest {
@@ -511,7 +512,7 @@ export interface UsersListResponse {
 
 export const usersApi = {
   list: (params?: { page?: number; limit?: number; role?: string; is_active?: boolean }) =>
-    api.get<UsersListResponse>('/users', { params }).then((r) => r.data),
+    api.get<UsersListResponse>('/users', { params }).then((r) => r.data.items),
 
   create: (data: UserCreateRequest) =>
     api.post<User>('/users', data).then((r) => r.data),
@@ -521,10 +522,10 @@ export const usersApi = {
   update: (id: number, data: UserUpdateRequest) =>
     api.put<User>(`/users/${id}`, data).then((r) => r.data),
 
-  updateRole: (id: number, role: string) =>
+  updateRole: (id: number, role: 'admin' | 'annotator') =>
     api.put<User>(`/users/${id}/role`, { role }).then((r) => r.data),
 
-  delete: (id: number) => api.delete(`/users/${id}`),
+  remove: (id: number) => api.delete(`/users/${id}`).then((r) => r.data),
 }
 
 export default api

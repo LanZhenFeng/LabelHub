@@ -105,6 +105,7 @@ async def create_user(
         username=user_data.username,
         email=user_data.email,
         hashed_password=hashed_password,
+        role=user_data.role,  # M4: Set role from request
     )
     db.add(new_user)
     await db.commit()

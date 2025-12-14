@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { cn } from '@/lib/utils'
-import { FolderKanban, PanelLeftClose, PanelLeftOpen, Settings, Keyboard, LogOut, User, Shield } from 'lucide-react'
+import { FolderKanban, PanelLeftClose, PanelLeftOpen, Settings, Keyboard, LogOut, User, Shield, Users } from 'lucide-react' // Added Users
 import { ShortcutsDialog } from '@/components/ShortcutsDialog'
 import { useUserStore } from '@/stores/userStore'
 import {
@@ -12,11 +12,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-
-const navItems = [
-  { href: '/projects', label: '项目', icon: FolderKanban },
-  { href: '/settings', label: '设置', icon: Settings, disabled: true },
-]
 
 export default function Layout() {
   const location = useLocation()
@@ -30,6 +25,27 @@ export default function Layout() {
     }
   })
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+
+  // M4: Dynamic navigation items based on user role
+  const navItems = useMemo(() => {
+    const items: Array<{
+      href: string
+      label: string
+      icon: typeof FolderKanban
+      disabled?: boolean
+    }> = [
+      { href: '/projects', label: '项目', icon: FolderKanban },
+    ]
+    
+    // M4: Admin-only navigation item
+    if (user?.role === 'admin') {
+      items.push({ href: '/users', label: '用户', icon: Users })
+    }
+    
+    items.push({ href: '/settings', label: '设置', icon: Settings, disabled: true })
+    
+    return items
+  }, [user?.role])
 
   const handleLogout = () => {
     logout()
@@ -65,7 +81,7 @@ export default function Layout() {
   const activeHref = useMemo(() => {
     const found = navItems.find((i) => location.pathname.startsWith(i.href))
     return found?.href ?? '/projects'
-  }, [location.pathname])
+  }, [location.pathname, navItems])
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-background via-background to-muted/40">
