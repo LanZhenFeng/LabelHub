@@ -85,7 +85,7 @@ export default function UsersPage() {
 
   const { data: users, isLoading } = useQuery({
     queryKey: ['users'],
-    queryFn: usersApi.list,
+    queryFn: () => usersApi.list(),
   })
 
   const createUserMutation = useMutation({
@@ -97,9 +97,28 @@ export default function UsersPage() {
       toast({ title: '创建成功', description: '用户已成功创建。' })
     },
     onError: (error: any) => {
+      // Handle Pydantic validation errors (422)
+      let errorMessage = '无法创建用户。'
+      
+      if (error.response?.data?.detail) {
+        const detail = error.response.data.detail
+        
+        // If detail is an array (Pydantic validation errors)
+        if (Array.isArray(detail)) {
+          errorMessage = detail
+            .map((err: any) => {
+              const field = err.loc?.join('.') || 'unknown'
+              return `${field}: ${err.msg}`
+            })
+            .join('; ')
+        } else if (typeof detail === 'string') {
+          errorMessage = detail
+        }
+      }
+      
       toast({
         title: '创建失败',
-        description: error.response?.data?.detail || '无法创建用户。',
+        description: errorMessage,
         variant: 'destructive',
       })
     },
@@ -112,8 +131,12 @@ export default function UsersPage() {
       queryClient.invalidateQueries({ queryKey: ['users'] })
       toast({ title: '更新成功', description: '用户角色已更新。' })
     },
-    onError: () => {
-      toast({ title: '更新失败', description: '无法更新用户角色。', variant: 'destructive' })
+    onError: (error: any) => {
+      const errorMessage =
+        typeof error.response?.data?.detail === 'string'
+          ? error.response.data.detail
+          : '无法更新用户角色。'
+      toast({ title: '更新失败', description: errorMessage, variant: 'destructive' })
     },
   })
 
@@ -123,8 +146,12 @@ export default function UsersPage() {
       queryClient.invalidateQueries({ queryKey: ['users'] })
       toast({ title: '删除成功', description: '用户已成功删除。' })
     },
-    onError: () => {
-      toast({ title: '删除失败', description: '无法删除用户。', variant: 'destructive' })
+    onError: (error: any) => {
+      const errorMessage =
+        typeof error.response?.data?.detail === 'string'
+          ? error.response.data.detail
+          : '无法删除用户。'
+      toast({ title: '删除失败', description: errorMessage, variant: 'destructive' })
     },
   })
 
@@ -136,6 +163,34 @@ export default function UsersPage() {
   }
 
   const handleCreateUser = () => {
+    // Frontend validation
+    if (password.length < 8) {
+      toast({
+        title: '验证失败',
+        description: '密码长度至少为8位',
+        variant: 'destructive',
+      })
+      return
+    }
+    
+    if (!/\d/.test(password)) {
+      toast({
+        title: '验证失败',
+        description: '密码必须包含至少一个数字',
+        variant: 'destructive',
+      })
+      return
+    }
+    
+    if (!/[a-zA-Z]/.test(password)) {
+      toast({
+        title: '验证失败',
+        description: '密码必须包含至少一个字母',
+        variant: 'destructive',
+      })
+      return
+    }
+    
     createUserMutation.mutate({
       username,
       email,
@@ -145,7 +200,7 @@ export default function UsersPage() {
   }
 
   // Filter users
-  const filteredUsers = users?.filter((user) => {
+  const filteredUsers = users?.filter((user: User) => {
     const matchesSearch =
       user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.email.toLowerCase().includes(searchQuery.toLowerCase())
@@ -197,7 +252,7 @@ export default function UsersPage() {
                 <Input
                   id="password"
                   type="password"
-                  placeholder="输入密码（至少6位）"
+                  placeholder="输入密码（至少8位，包含字母和数字）"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
@@ -225,7 +280,7 @@ export default function UsersPage() {
                   !username.trim() ||
                   !email.trim() ||
                   !password.trim() ||
-                  password.length < 6 ||
+                  password.length < 8 ||
                   createUserMutation.isPending
                 }
               >
@@ -294,7 +349,7 @@ export default function UsersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredUsers.map((user) => (
+                {filteredUsers.map((user: User) => (
                   <TableRow key={user.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
